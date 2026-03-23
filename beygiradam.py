@@ -4,67 +4,60 @@ import requests
 from bs4 import BeautifulSoup
 import re
 
-# --- PREMİUM TASARIM ---
-st.set_page_config(page_title="BEYGİR ADAM | LİNK ANALİZ", page_icon="🏇", layout="wide")
+# --- TASARIM ---
+st.set_page_config(page_title="BEYGİR ADAM | KESİN ÇÖZÜM", page_icon="🏇", layout="wide")
 
 st.markdown("""
     <style>
     .main { background-color: #0e1117; color: white; }
-    .stTextInput input { background-color: #1e1e1e; color: #FF8C00; border: 1px solid #FF8C00; }
-    .header-style { color: #FF8C00; font-size: 30px; font-weight: bold; text-align: center; margin-bottom: 20px; }
+    .header-style { color: #FF8C00; font-size: 30px; font-weight: bold; text-align: center; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- LİNK OKUMA MOTORU ---
-def linkten_veri_cek(url):
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"}
+# --- AKILLI LİNK AYIKLAYICI ---
+def veriyi_süz(url):
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
     try:
-        response = requests.get(url, headers=headers, timeout=10)
-        soup = BeautifulSoup(response.content, 'html.parser')
+        r = requests.get(url, headers=headers, timeout=10)
+        # Sitenin içindeki tabloyu yakala
+        soup = BeautifulSoup(r.content, 'html.parser')
         
-        # Sitedeki tüm metni çek ve temizle
-        metin = soup.get_text()
-        satirlar = metin.split('\n')
+        # Karmaşık harfleri engellemek için sadece At ve HP kalıbına odaklan
+        raw_text = soup.get_text()
+        lines = raw_text.split('\n')
         
-        analiz_listesi = []
-        for satir in satirlar:
-            satir = satir.strip()
-            # Satırda At İsmi (Büyük Harf) ve Handikap (Sayı) ara
-            at_adi = re.findall(r'[A-ZÇĞİÖŞÜ]{4,}', satir)
-            sayilar = re.findall(r'\d+', satir)
+        final_data = []
+        for line in lines:
+            # Sadece Büyük Harf (At) ve yanındaki Sayıyı (HP) yakala
+            horse = re.search(r'([A-ZÇĞİÖŞÜ]{4,})', line)
+            score = re.findall(r'\d{2,3}', line)
             
-            if at_adi and len(sayilar) >= 1:
-                hp = int(sayilar[-1])
-                if hp > 10: # No veya Yaş değilse HP kabul et
-                    analiz_listesi.append({
-                        "AT ADI": at_adi[0],
-                        "HANDİKAP": hp,
-                        "B.ADAM PUANI": min(int(hp * 0.7 + 15), 99)
+            if horse and score:
+                hp_val = int(score[-1])
+                if 30 < hp_val < 130: # Mantıklı Handikap aralığı
+                    final_data.append({
+                        "AT ADI": horse.group(1),
+                        "HANDİKAP": hp_val,
+                        "B.ADAM PUANI": min(int(hp_val * 0.7 + 15), 99)
                     })
-        return pd.DataFrame(analiz_listesi).drop_duplicates(subset=['AT ADI'])
-    except Exception as e:
-        return f"Hata: {e}"
+        return pd.DataFrame(final_data).drop_duplicates(subset=['AT ADI'])
+    except:
+        return None
 
-# --- ARAYÜZ ---
-st.markdown('<div class="header-style">🏇 BEYGİR ADAM v22.0 (Link Okuyucu)</div>', unsafe_allow_html=True)
+# --- EKRAN ---
+st.markdown('<div class="header-style">🏇 BEYGİR ADAM v23.0</div>', unsafe_allow_html=True)
 
-# Kullanıcıdan Link Alma
-bulten_linki = st.text_input("Bülten Linkini Buraya Yapıştırın (Örn: GanyanTime veya Hipodrom bülten linki):")
+target_url = st.text_input("Bülten Linkini Buraya Yapıştırın:", placeholder="https://www.ganyantime.com/at-yarisi-bulteni/")
 
-if st.button("LİNKİ ANALİZ ET"):
-    if bulten_linki:
-        with st.spinner('Linkteki veriler taranıyor...'):
-            df = linkten_veri_cek(bulten_linki)
-            
-            if isinstance(df, pd.DataFrame) and not df.empty:
-                st.success("✅ Veriler linkten başarıyla çekildi!")
+if st.button("ANALİZ ET"):
+    if target_url:
+        # Eğer PDF linki atılırsa uyar
+        if ".pdf" in target_url:
+            st.error("⚠️ PDF linkleri doğrudan okunamaz. Lütfen bir web sayfası (HTML) bülten linki yapıştırın.")
+        else:
+            df = veriyi_süz(target_url)
+            if df is not None and not df.empty:
                 st.dataframe(df.sort_values(by="HANDİKAP", ascending=False), use_container_width=True, hide_index=True)
-                
-                fav = df.sort_values(by="HANDİKAP", ascending=False).iloc[0]
-                st.info(f"🏆 **Analiz Sonucu Favori:** {fav['AT ADI']} (%{fav['B.ADAM PUANI']})")
+                st.success(f"🏆 Favori: {df.iloc[0]['AT ADI']}")
             else:
-                st.error("Linkten veri çekilemedi. Site bot koruması kullanıyor olabilir.")
-    else:
-        st.warning("Lütfen bir link girin.")
-
-st.sidebar.info("Bu sürüm verdiğiniz URL üzerinden otomatik tarama yapar.")
+                st.error("Veri çekilemedi. Lütfen farklı bir bülten sitesi linki deneyin.")
