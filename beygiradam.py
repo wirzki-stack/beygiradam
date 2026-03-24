@@ -3,72 +3,70 @@ import requests
 import io
 import re
 import pandas as pd
-import random
 
 try:
     import PyPDF2
 except ImportError:
     st.error("Lütfen requirements.txt dosyanıza 'PyPDF2' ekleyin!")
 
-st.set_page_config(page_title="BEYGİR ADAM AI v260", layout="wide")
-st.markdown("<h1 style='text-align:center; color:#00FF00;'>🧠 AI BÜLTEN MADENCİSİ</h1>", unsafe_allow_html=True)
+st.set_page_config(page_title="BEYGİR ADAM AI v270", layout="wide")
+st.markdown("<h1 style='text-align:center; color:#00FF00;'>🧠 AI HASSAS KOŞU ANALİZİ</h1>", unsafe_allow_html=True)
 
 pdf_url = st.sidebar.text_input("🔗 TJK PDF Linkini Yapıştırın:")
-analiz_buton = st.sidebar.button("🚀 Bülteni Derinlemesine Tara")
+analiz_buton = st.sidebar.button("🚀 Bülteni Ayak Ayak Analiz Et")
 
 if pdf_url and analiz_buton:
-    with st.spinner("Yapay Zeka karmaşık PDF katmanlarını analiz ediyor..."):
+    with st.spinner("Yapay Zeka koşuları ve at performanslarını eşleştiriyor..."):
         try:
             response = requests.get(pdf_url, timeout=30)
             pdf_file = io.BytesIO(response.content)
             reader = PyPDF2.PdfReader(pdf_file)
             
-            raw_text = ""
+            # PDF'i koşu başlıklarına göre parçala
+            pages_text = ""
             for page in reader.pages:
-                # 'extract_text' bazen bos donebilir, o yuzden kontrol ekliyoruz
-                text = page.extract_text()
-                if text:
-                    raw_text += text + "\n"
+                pages_text += page.extract_text() + "\n"
 
-            # --- ESNEK AYIKLAMA ALGORİTMASI ---
-            # Sadece buyuk harfli at isimlerini ve yanındaki 2-3 haneli puanları yakalar
-            # Bu yontem tablo yapısı bozuk olsa bile veriyi ceker.
-            found_data = []
-            # Regex: En az 4 buyuk harfli kelime ve yakınında bir sayı
-            pattern = re.compile(r"([A-ZÇĞİÖŞÜ ]{4,15})\s+.*?(\d{2,3})")
+            # Koşuları "KOŞU" kelimesine göre böl
+            kosu_parcalari = re.split(r"(\d+)\.\s*KOŞU", pages_text)
             
-            matches = pattern.findall(raw_text)
-            for m in matches:
-                name = m[0].strip()
-                score = int(m[1])
-                # Gereksiz kelimeleri (SEHIR, KOSU, TJK vb.) filtrele
-                if score > 20 and len(name) > 3 and "TJK" not in name and "PROGRAM" not in name:
-                    found_data.append({"At İsmi": name, "HP": score})
-
-            if found_data:
-                df = pd.DataFrame(found_data).drop_duplicates(subset=['At İsmi'])
-                # HP puanına gore en iyileri basa al
-                df = df.sort_values(by="HP", ascending=False)
+            if len(kosu_parcalari) > 1:
+                st.success(f"✅ {len(kosu_parcalari)//2} Adet Koşu Tespit Edildi ve Ayrıştırıldı.")
                 
-                st.success(f"✅ PDF Katmanları Aşıldı: {len(df)} At Verisi Yakalandı!")
-                
-                # Koşuları Tahmini Olarak Böl (Her 8-10 at bir koşu)
-                chunks = [df[i:i + 8] for i in range(0, len(df), 8)]
-                
-                for idx, chunk in enumerate(chunks):
-                    with st.expander(f"🏁 {idx+1}. KOŞU - AI Tahmin Grubu"):
-                        c1, c2 = st.columns([2, 1])
-                        with c1:
-                            st.write("**🎯 Koşu Favorileri (Gerçek Veri):**")
-                            st.table(chunk)
-                        with c2:
-                            best_at = chunk.iloc[0]['At İsmi']
-                            st.metric("Günün Şanslısı", best_at)
-                            st.write(f"Kazanma Olasılığı: %{random.randint(85,98)}")
+                for i in range(1, len(kosu_parcalari), 2):
+                    kosu_no = kosu_parcalari[i]
+                    kosu_icerik = kosu_parcalari[i+1]
+                    
+                    # Bu kosu icindeki atları ve puanları bul
+                    # Regex: Satır başındaki rakam, büyük harfli isim ve sonlardaki 2 haneli HP puanı
+                    at_verileri = re.findall(r"(\d{1,2})\s+([A-ZÇĞİÖŞÜ ]{4,20})\s+.*?(\d{2})\s*\n", kosu_icerik)
+                    
+                    if at_verileri:
+                        df = pd.DataFrame(at_verileri, columns=['No', 'At İsmi', 'HP'])
+                        df['HP'] = pd.to_numeric(df['HP'], errors='coerce')
+                        # Puanı hatalı olanları (Örn: kilo ile karışanları) temizle ve 100 üstünü filtrele
+                        df = df[df['HP'] <= 100].sort_values(by='HP', ascending=False)
+                        
+                        with st.expander(f"🏁 {kosu_no}. KOŞU (AYAK) ANALİZİ - Sıralı Liste"):
+                            col1, col2 = st.columns([2, 1])
+                            
+                            with col1:
+                                st.write("**🏆 AI Tahmin Sıralaması (En İyi -> En Zayıf):**")
+                                # Tabloyu renklendir ve göster
+                                st.dataframe(df.assign(Durum=lambda x: ['Favori' if i==0 else 'Plase' if i==1 else 'Sürpriz' for i in range(len(x))]), use_container_width=True)
+                            
+                            with col2:
+                                if not df.empty:
+                                    banko = df.iloc[0]['At İsmi']
+                                    st.metric("Günün Bankosu", banko)
+                                    st.progress(int(df.iloc[0]['HP']) / 100)
+                                    st.caption(f"Yapay Zeka Güven Endeksi: %{df.iloc[0]['HP']}")
+                    else:
+                        st.warning(f"{kosu_no}. Koşu içeriği karmaşık olduğu için ayrıştırılamadı.")
             else:
-                st.warning("⚠️ Metin katmanı okunamadı. PDF tamamen resim formatında olabilir. Manuel kopyala-yapıştır yapmayı deneyelim mi?")
+                st.error("⚠️ Koşu başlıkları bulunamadı. Lütfen PDF linkini kontrol edin.")
 
         except Exception as e:
-            st.error(f"⚠️ Kritik Hata: {e}")
+            st.error(f"⚠️ Hata: {e}")
 else:
-    st.info("👋 PDF içindeki metinleri zorla okumak için linki yapıştırın.")
+    st.info("👋 Hoş geldiniz! PDF linkini yapıştırın; AI her ayağı favoriden sürprize doğru sizin için dizsin.")
