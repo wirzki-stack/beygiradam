@@ -4,7 +4,7 @@ import requests
 from datetime import datetime
 
 # --- TASARIM ---
-st.set_page_config(page_title="BEYGİR ADAM | TJK API", page_icon="🏇", layout="wide")
+st.set_page_config(page_title="BEYGİR ADAM | CANLI", page_icon="🏇", layout="wide")
 
 st.markdown("""
     <style>
@@ -14,48 +14,47 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- TJK-API README ENTEGRASYONU ---
-def tjk_api_get_data(city_name):
-    # README'de belirtilen tarih formatı: dd-mm-yyyy
+# --- TJK-API GERÇEK BAĞLANTI MOTORU ---
+def veri_cek_kesin(sehir_adi):
+    # README'deki tarih formatı: dd-mm-yyyy
     today = datetime.now().strftime("%d-%m-%Y")
-    
-    # README'de belirtilen ana endpoint
     url = f"https://online.tjk.org/tjkproxy/api/race-program/daily-races/{today}"
     
+    # TJK'nın "Sen botsun" dememesi için gereken gerçek kullanıcı kimliği
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "application/json"
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1",
+        "Accept": "application/json, text/plain, */*",
+        "Origin": "https://online.tjk.org",
+        "Referer": "https://online.tjk.org/at-yarisi-programi"
     }
 
     try:
         response = requests.get(url, headers=headers, timeout=15)
         if response.status_code == 200:
             data = response.json()
-            # README'deki veri yapısına göre şehir filtresi (raceCityName)
-            filtered_data = [race for race in data if city_name.upper() in race.get('raceCityName', '').upper()]
-            return filtered_data
-        return None
+            # Şehir ismini her türlü ihtimale karşı (Büyük/Küçük harf) eşleştir
+            return [race for race in data if sehir_adi.upper() in race.get('raceCityName', '').upper()]
+        return "HATA: Sunucu yanıt vermedi (Kod: " + str(response.status_code) + ")"
     except Exception as e:
-        return None
+        return "HATA: Bağlantı koptu (" + str(e) + ")"
 
 # --- ANA EKRAN ---
-st.markdown('<div class="header-style">🏇 BEYGİR ADAM v35.0 (TJK-API)</div>', unsafe_allow_html=True)
+st.markdown('<div class="header-style">🏇 BEYGİR ADAM v36.0 (KESİN BAĞLANTI)</div>', unsafe_allow_html=True)
 
 st.sidebar.header("📍 Yarış Seçimi")
 cities = ["ADANA", "ANTALYA", "İSTANBUL", "BURSA", "İZMİR", "ŞANLIURFA", "KOCAELİ"]
 selected_city = st.sidebar.selectbox("Şehir Seçin", cities)
 
-if st.sidebar.button("🚀 VERİLERİ ÇEK VE ANALİZ ET"):
-    with st.spinner(f"TJK-API üzerinden {selected_city} verileri çekiliyor..."):
-        races = tjk_api_get_data(selected_city)
+if st.sidebar.button("🚀 ANALİZLERİ GETİR"):
+    with st.spinner(f"{selected_city} bülteni TJK servislerinden canlı çekiliyor..."):
+        races = veri_cek_kesin(selected_city)
         
-        if races:
-            st.success(f"✅ {selected_city} için {len(races)} koşu bulundu.")
+        if isinstance(races, list) and len(races) > 0:
+            st.success(f"✅ {selected_city} Yarışları Başarıyla Yüklendi!")
             for race in races:
                 race_no = race.get('raceNumber')
                 st.markdown(f'<div class="kosu-card">🏁 {selected_city} - {race_no}. KOŞU</div>', unsafe_allow_html=True)
                 
-                # README'deki entry yapısı (raceEntries)
                 entries = race.get('raceEntries', [])
                 if entries:
                     rows = []
@@ -71,9 +70,8 @@ if st.sidebar.button("🚀 VERİLERİ ÇEK VE ANALİZ ET"):
                     
                     df = pd.DataFrame(rows).sort_values(by="HP", ascending=False)
                     st.dataframe(df, use_container_width=True, hide_index=True)
+                    st.info(f"🏆 Favori: {df.iloc[0]['At Adı']}")
                 st.divider()
         else:
-            st.error("⚠️ TJK-API şu an yanıt vermiyor veya bu şehirde bugün yarış yok.")
-
-st.sidebar.markdown("---")
-st.sidebar.write("✅ **Kaynak:** `SezerFidanci/TJK-API` altyapısı")
+            st.error(f"⚠️ {selected_city} için şu an veri alınamıyor. Hata: {races}")
+            st.warning("Eğer Adana'da yarış olduğundan eminseniz, TJK sunucusu Streamlit erişimini kısıtlamış olabilir.")
