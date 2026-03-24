@@ -4,7 +4,7 @@ import datetime
 import os
 
 def verileri_cek():
-    # Repodaki formata göre bugünün tarihini al (Örn: 20260324)
+    # Repodaki formata göre bugünün tarihi
     bugun = datetime.datetime.now().strftime("%Y%m%d")
     url = f"https://api.tjk.org/v1/race/program/{bugun}"
     
@@ -15,20 +15,29 @@ def verileri_cek():
     }
 
     try:
-        print(f"🔗 {bugun} verisi TJK API'den çekiliyor...")
+        print(f"🔗 TJK API Bağlantısı kuruluyor: {bugun}")
         response = requests.get(url, headers=headers, timeout=20)
         
         if response.status_code == 200:
-            data = response.json()
-            # Veri boş değilse kaydet
-            if data:
+            raw_data = response.json()
+            
+            # API'den gelen ham veri genellikle bir sözlük içindeki 'data' listesindedir
+            # Repodaki yapıya göre veriyi kontrol edip temizleyelim
+            final_data = []
+            if isinstance(raw_data, list):
+                final_data = raw_data
+            elif isinstance(raw_data, dict):
+                # TJK API'nin farklı dönme ihtimallerine karşı:
+                final_data = raw_data.get('data', raw_data.get('QueryResult', []))
+
+            if final_data:
                 with open("veriler.json", "w", encoding="utf-8") as f:
-                    json.dump(data, f, ensure_all_ascii=False, indent=4)
-                print("✅ Başarılı: veriler.json güncellendi.")
+                    json.dump(final_data, f, ensure_all_ascii=False, indent=4)
+                print(f"✅ Başarılı: {len(final_data)} yarış verisi kaydedildi.")
             else:
-                print("⚠️ API yanıt verdi ama veri boş.")
+                print("⚠️ API yanıtı boş geldi (Yarışlar henüz başlamamış olabilir).")
         else:
-            print(f"❌ Hata Kodu: {response.status_code}")
+            print(f"❌ API Hatası: {response.status_code}")
     except Exception as e:
         print(f"⚠️ Kritik Hata: {e}")
 
