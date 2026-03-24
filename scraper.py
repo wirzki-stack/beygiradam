@@ -3,10 +3,10 @@ import json
 import os
 
 def verileri_cek():
-    # Bugünün (24 Mart) resmi bülten API adresi
+    # TJK'nın bugün (24 Mart) için veriyi sunduğu resmi API adresi
     url = "https://api.tjk.org/v1/race/program/20260324"
     
-    # TJK'yı "ben bir insanım" diye ikna eden en güncel tarayıcı bilgileri
+    # TJK'yı "ben gerçek bir insanım" diye ikna eden en güçlü başlıklar
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
         "Accept": "application/json, text/plain, */*",
@@ -18,19 +18,19 @@ def verileri_cek():
     }
 
     try:
-        print("🔗 TJK ana kapısına sızılıyor...")
+        print("🔗 TJK Sunucusuna güvenli bağlantı kuruluyor...")
         # Bir oturum (session) başlatıyoruz ki TJK bizi gerçek bir kullanıcı sansın
         session = requests.Session()
-        # Önce ana sayfadan bir 'merhaba' çerezi alalım
-        session.get("https://www.tjk.org", headers={"User-Agent": headers["User-Agent"]}, timeout=10)
+        # Önce ana sayfaya gidip bir 'ziyaretçi çerezi' (cookie) alalım
+        session.get("https://www.tjk.org", headers={"User-Agent": headers["User-Agent"]}, timeout=15)
         
-        # Şimdi asıl bülteni istiyoruz
+        # Şimdi çerezlerle beraber asıl bülteni istiyoruz
         response = session.get(url, headers=headers, timeout=20)
         
         if response.status_code == 200:
             data = response.json()
             
-            # Veri yapısını kontrol et ve ayıkla
+            # Veriyi kontrol et ve içeriğe göre ayıkla
             actual_data = []
             if isinstance(data, list):
                 actual_data = data
@@ -42,12 +42,18 @@ def verileri_cek():
                     json.dump(actual_data, f, ensure_all_ascii=False, indent=4)
                 print(f"✅ BAŞARILI: {len(actual_data)} adet yarış verisi kaydedildi!")
             else:
-                print("⚠️ TJK'dan veri geldi ama liste boş. Program henüz sisteme girilmemiş olabilir.")
+                print("⚠️ TJK'dan veri geldi ama liste boş. Program henüz yayınlanmamış olabilir.")
+                # Boş olsa bile dosyayı oluştur ki hata vermesin
+                with open("veriler.json", "w") as f: json.dump([], f)
         else:
             print(f"❌ TJK Engeli: Hata Kodu {response.status_code}")
+            raise Exception(f"TJK API hatası: {response.status_code}")
             
     except Exception as e:
         print(f"⚠️ Kritik Hata: {e}")
+        # Hata durumunda boş dosya oluşturarak robotun çökmesini engelle
+        if not os.path.exists("veriler.json"):
+            with open("veriler.json", "w") as f: json.dump([], f)
 
 if __name__ == "__main__":
     verileri_cek()
