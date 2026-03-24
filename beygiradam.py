@@ -3,36 +3,44 @@ import pandas as pd
 import json
 import os
 
-st.set_page_config(page_title="BEYGİR ADAM | CANLI", page_icon="🏇", layout="wide")
+st.set_page_config(page_title="BEYGİR ADAM | V42", page_icon="🏇", layout="wide")
 
-st.markdown("<h1 style='text-align:center; color:#FF8C00;'>🏆 BEYGİR ADAM v41.3</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align:center; color:#FF8C00;'>🏇 BEYGİR ADAM v42.0</h1>", unsafe_allow_html=True)
 
-if not os.path.exists("veriler.json") or os.stat("veriler.json").st_size == 0:
-    st.warning("🔄 Veri deposu boş veya henüz dolmadı. GitHub Actions'ı 'Run Workflow' yaparak tetikleyin.")
-else:
-    try:
-        with open("veriler.json", "r", encoding="utf-8") as f:
-            data = json.load(f)
+# DOSYA KONTROL VE YÜKLEME
+file_path = "veriler.json"
 
-        if data and isinstance(data, list):
-            # Şehir listesini temizle ve çıkar
-            sehir_listesi = sorted(list(set([r.get('raceCityName') for r in data if r.get('raceCityName')])))
+if not os.path.exists(file_path):
+    st.error("⚠️ VERİ DOSYASI BULUNAMADI!")
+    st.info("Lütfen GitHub Actions sekmesinden robotu (Scraper) çalıştırın ve yeşil tik olmasını bekleyin.")
+    st.stop() # Burada dur, beyaz ekrana düşme
+
+try:
+    with open(file_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    
+    if not data:
+        st.warning("⚠️ Dosya bulundu ama içi boş. Robot henüz veriyi yazamamış.")
+    else:
+        # Şehirleri Çek
+        sehirler = sorted(list(set([r.get('raceCityName') for r in data if r.get('raceCityName')])))
+        
+        if sehirler:
+            secilen = st.sidebar.selectbox("📍 Şehir Seçin:", sehirler)
             
-            if sehir_listesi:
-                secilen = st.sidebar.selectbox("📍 Şehir Seçin:", sehir_listesi)
-                st.sidebar.success(f"{len(sehir_listesi)} Şehir Yüklendi")
-
-                races = [r for r in data if r.get('raceCityName') == secilen]
-                for race in races:
-                    st.markdown(f"### 🏁 {secilen} - {race.get('raceNumber')}. KOŞU")
+            # Koşuları Listele
+            races = [r for r in data if r.get('raceCityName') == secilen]
+            for race in races:
+                with st.expander(f"🏁 {secilen} - {race.get('raceNumber')}. KOŞU", expanded=True):
                     entries = race.get('raceEntries', [])
                     if entries:
                         df = pd.DataFrame([{"At": e['horseName'], "Jokey": e['jockeyName'], "HP": e['handicapScore'] or 0} for e in entries])
+                        df = df.sort_values(by="HP", ascending=False)
                         df["Skor"] = df["HP"].apply(lambda x: f"%{min(int(x*0.7+15), 99)}" if x > 0 else "%--")
-                        st.dataframe(df.sort_values(by="HP", ascending=False), use_container_width=True, hide_index=True)
-            else:
-                st.error("Dosya var ama içinde şehir verisi bulunamadı.")
+                        st.table(df) # Donmayı engellemek için daha hafif olan table kullanıyoruz
         else:
-            st.error("Veriler okunamıyor veya formatı hatalı.")
-    except Exception as e:
-        st.error(f"❌ HATA: {e}")
+            st.error("Şehir verisi ayıklanamadı.")
+
+except Exception as e:
+    st.error(f"⚠️ Bir hata oluştu: {e}")
+    st.info("Robotun veriyi doğru çektiğinden emin olun.")
