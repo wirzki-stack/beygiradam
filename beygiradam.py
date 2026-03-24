@@ -1,12 +1,10 @@
 import streamlit as st
 import pandas as pd
 import requests
-from bs4 import BeautifulSoup
-import re
 from datetime import datetime
 
 # --- TASARIM ---
-st.set_page_config(page_title="BEYGİR ADAM | KESİN SONUÇ", page_icon="🏇", layout="wide")
+st.set_page_config(page_title="BEYGİR ADAM | CANLI", page_icon="🏇", layout="wide")
 
 st.markdown("""
     <style>
@@ -16,58 +14,64 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- VERİ KURTARMA MOTORU ---
-def veri_getir(sehir):
-    # TJK engelli olduğu için alternatif veri kaynağına yönleniyoruz
-    # Bu metod, TJK'nın bot engelini aşan yedek bir servistir.
-    bugun = datetime.now().strftime("%d.%m.%Y")
+# --- TJK CANLI VERİ MOTORU ---
+def tjk_canli_veri_cek(sehir_adi):
+    bugun = datetime.now().strftime("%d-%m-%Y")
+    # TJK Resmi Mobil API Ucu
+    url = f"https://online.tjk.org/tjkproxy/api/race-program/daily-races/{bugun}"
     
-    # Not: Burada Türkiye'deki yarışları gerçek zamanlı takip eden 
-    # ve bot engeli olmayan bir yapı kullanıyoruz.
+    headers = {
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1",
+        "Accept": "application/json"
+    }
+
     try:
-        # Örnek olarak Adana bültenindeki gerçek atları sisteme tanımlıyoruz
-        # Uygulama artık hata vermek yerine bu gerçek listeyi analiz eder.
-        bulten = {
-            "ADANA": [
-                {"At": "SİNSİNATEŞİ", "Jokey": "A.ÇELİK", "HP": 98},
-                {"At": "HALİD BEY", "Jokey": "H.KARATAŞ", "HP": 105},
-                {"At": "CANAGEL", "Jokey": "G.KOCAKAYA", "HP": 92},
-                {"At": "GÖKÇESTAR", "Jokey": "M.KAYA", "HP": 88},
-                {"At": "BABA ARİF", "Jokey": "Ö.YILDIRIM", "HP": 94}
-            ],
-            "ANTALYA": [
-                {"At": "KAYASEL", "Jokey": "AKURŞUN", "HP": 85},
-                {"At": "BALMELDA", "Jokey": "M.ÇİÇEK", "HP": 79}
-            ]
-        }
-        return bulten.get(sehir.upper(), bulten["ADANA"])
+        response = requests.get(url, headers=headers, timeout=15)
+        if response.status_code == 200:
+            data = response.json()
+            # Şehir bazlı filtreleme
+            return [r for r in data if sehir_adi.upper() in r.get('raceCityName', '').upper()]
+        return None
     except:
         return None
 
 # --- ANA EKRAN ---
-st.markdown('<div class="header-style">🏇 BEYGİR ADAM v33.0 (GÜVENLİ HAT)</div>', unsafe_allow_html=True)
+st.markdown('<div class="header-style">🏇 BEYGİR ADAM v34.0 (CANLI ANALİZ)</div>', unsafe_allow_html=True)
 
 st.sidebar.header("Yarış Seçimi")
 sehirler = ["ADANA", "ANTALYA", "İSTANBUL", "BURSA", "İZMİR", "ŞANLIURFA", "KOCAELİ"]
 secilen_sehir = st.sidebar.selectbox("Şehir Seçin", sehirler)
 
-if st.sidebar.button("🚀 TAHMİNLERİ OLUŞTUR"):
-    with st.spinner(f"{secilen_sehir} için güvenli veri hattı kuruluyor..."):
-        data = veri_getir(secilen_sehir)
+if st.sidebar.button("🚀 VERİLERİ OTOMATİK GETİR"):
+    with st.spinner(f"{secilen_sehir} verileri çekiliyor..."):
+        races = tjk_canli_veri_cek(secilen_sehir)
         
-        if data:
-            st.success(f"✅ {secilen_sehir} Analizleri Hazır!")
-            for i in range(1, 8): # Örnek 7 Koşu
-                st.markdown(f'<div class="kosu-card">🏁 {secilen_sehir} - {i}. KOŞU</div>', unsafe_allow_html=True)
+        if races:
+            for race in races:
+                r_no = race.get('raceNumber')
+                st.markdown(f'<div class="kosu-card">🏁 {secilen_sehir} - {r_no}. KOŞU</div>', unsafe_allow_html=True)
                 
-                df = pd.DataFrame(data)
-                # Puanlama algoritması
-                df["B.Adam Skoru"] = df["HP"].apply(lambda x: f"%{min(int(x * 0.7 + 10), 99)}")
-                
-                st.dataframe(df.sort_values(by="HP", ascending=False), use_container_width=True, hide_index=True)
-                st.info(f"🏆 Favori: {df.iloc[0]['At']}")
+                horses = race.get('raceEntries', [])
+                if horses:
+                    df_list = []
+                    for h in horses:
+                        hp = h.get('handicapScore', 0) or 0
+                        df_list.append({
+                            "At": h.get('horseName'),
+                            "Jokey": h.get('jockeyName'),
+                            "Kilo": h.get('weight'),
+                            "HP": hp,
+                            "Skor": f"%{min(int(hp * 0.7 + 15), 99)}" if hp > 0 else "%--"
+                        })
+                    
+                    df = pd.DataFrame(df_list).sort_values(by="HP", ascending=False)
+                    st.dataframe(df, use_container_width=True, hide_index=True)
+                    
+                    if not df.empty:
+                        st.info(f"🏆 Favori: {df.iloc[0]['At']}")
+                st.divider()
         else:
-            st.error("Veri hattında bir sorun oluştu. Lütfen sayfayı yenileyin.")
+            st.error(f"⚠️ {secilen_sehir} için veri alınamadı. Lütfen internet bağlantısını kontrol edip tekrar deneyin.")
 
 st.sidebar.markdown("---")
-st.sidebar.write("✅ **Veri Kaynağı:** Güvenli Yedek Sunucu")
+st.sidebar.write("✅ **Durum:** API Bağlantısı Hazır")
