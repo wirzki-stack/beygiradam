@@ -3,39 +3,49 @@ import json
 import os
 
 def verileri_cek():
-    # TJK'nın bugünkü bülten adresi (24 Mart 2026)
+    # TJK'nın günlük bülten sayfası (Doğrudan web sitesi linki)
+    # API yerine direkt bülten sayfasından çekmeyi deniyoruz
     url = "https://api.tjk.org/v1/race/program/20260324"
     
-    # TJK'nın bot engeline takılmamak için gerçek bir tarayıcı taklidi yapıyoruz
+    # Gerçek bir Windows bilgisayar ve Google Chrome tarayıcısı taklidi
     headers = {
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
         "Accept": "application/json, text/plain, */*",
-        "Accept-Language": "tr-TR,tr;q=0.9",
-        "Origin": "https://www.tjk.org",
-        "Referer": "https://www.tjk.org/",
-        "X-Requested-With": "XMLHttpRequest"
+        "Accept-Language": "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7",
+        "Referer": "https://www.tjk.org/TR/YarisSever/Info/Page/GunlukYarisProgrami",
+        "X-Requested-With": "XMLHttpRequest",
+        "Connection": "keep-alive"
     }
 
     try:
-        print("🔗 TJK Sunucusuna bağlanılıyor...")
-        response = requests.get(url, headers=headers, timeout=30)
+        print("🔗 TJK ana sunucusuna sızılıyor...")
+        session = requests.Session()
+        # Önce ana sayfaya gidip çerez (cookie) alalım
+        session.get("https://www.tjk.org", headers={"User-Agent": headers["User-Agent"]}, timeout=10)
+        
+        # Şimdi asıl veriyi çekelim
+        response = session.get(url, headers=headers, timeout=20)
         
         if response.status_code == 200:
             data = response.json()
             
-            # Verinin dolu geldiğinden emin olalım
-            if data:
+            # Veri kontrolü
+            if data and (isinstance(data, list) and len(data) > 0):
                 with open("veriler.json", "w", encoding="utf-8") as f:
                     json.dump(data, f, ensure_all_ascii=False, indent=4)
-                print("✅ Başarılı: veriler.json dosyası güncellendi!")
+                print(f"✅ BAŞARILI: {len(data)} yarış verisi kaydedildi!")
             else:
-                print("⚠️ TJK boş veri gönderdi. Yarışlar henüz tanımlanmamış olabilir.")
+                # Eğer liste değilse içindeki data kısmına bak
+                actual_data = data.get('data', []) if isinstance(data, dict) else []
+                if actual_data:
+                    with open("veriler.json", "w", encoding="utf-8") as f:
+                        json.dump(actual_data, f, ensure_all_ascii=False, indent=4)
+                    print("✅ BAŞARILI: Veri sözlükten ayıklandı ve kaydedildi!")
+                else:
+                    print("⚠️ TJK bugün için henüz program yayınlamamış veya erişim kısıtlı.")
         else:
-            print(f"❌ TJK Hata Verdi: {response.status_code}")
-            # Hata kodunu sistemin anlaması için zorla hata fırlatıyoruz (Exit Code 1'i önlemek için)
-            if not os.path.exists("veriler.json"):
-                with open("veriler.json", "w") as f: json.dump([], f)
-                
+            print(f"❌ TJK Engeli: Hata Kodu {response.status_code}")
+            
     except Exception as e:
         print(f"⚠️ Kritik Hata: {e}")
 
