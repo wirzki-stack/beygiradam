@@ -4,20 +4,22 @@ import json
 import os
 
 # Sayfa donmasını engellemek için temel ayarlar
-st.set_page_config(page_title="BEYGİR ADAM | V50", layout="wide")
+st.set_page_config(page_title="BEYGİR ADAM | V51", layout="wide")
 
-st.markdown("<h1 style='text-align:center; color:#FF8C00;'>🏇 BEYGİR ADAM v50.0</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align:center; color:#FF8C00;'>🏇 BEYGİR ADAM v51.0</h1>", unsafe_allow_html=True)
 
 file_path = "veriler.json"
 
 # --- DOSYA KONTROLÜ (BEYAZ EKRAN KATİLİ) ---
 if not os.path.exists(file_path):
     st.error("🚨 DOSYA BULUNAMADI: veriler.json dosyası henüz GitHub reponda oluşmamış.")
-    st.info("Bunun sebebi GitHub Actions'ın (robotun) veriyi kaydedememiş olmasıdır.")
+    st.info("Bu beyaz ekranın geçmesi için GitHub robotunun (Actions) en az bir kez başarıyla çalışması gerekir.")
     st.markdown("""
-    **Çözüm İçin Şuraya Bak:**
-    1. GitHub reponun ana sayfasına git, `veriler.json` dosyası orada var mı?
-    2. Yoksa, **Actions** sekmesine git ve son çalışan robotun yanında **Kırmızı Çarpı** var mı kontrol et.
+    **Çözüm Yolu:**
+    1. GitHub repona git.
+    2. **Actions** sekmesine tıkla.
+    3. **TJK Data Scraper** -> **Run workflow** butonuna bas.
+    4. İşlem bittiğinde (Yeşil Tik olunca) bu sayfayı yenile.
     """)
     st.stop() # Uygulamayı burada durdurarak beyaz ekranı kırar.
 
