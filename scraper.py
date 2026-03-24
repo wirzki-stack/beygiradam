@@ -4,7 +4,7 @@ import json
 import os
 
 def verileri_cek():
-    # Bülten verisi için alternatif kaynak
+    # Bülten için alternatif ve daha stabil kaynak
     url = "https://www.atyarisi.com/at-yarisi-bulteni"
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36"
@@ -15,10 +15,8 @@ def verileri_cek():
         response = requests.get(url, headers=headers, timeout=20)
         
         if response.status_code == 200:
-            # Not: Tam kazıma (scraping) işlemi sitenin HTML yapısına bağlıdır.
-            # Şu an için hata almamak ve Streamlit'i ayağa kaldırmak için 
-            # yapılandırılmış bir veri seti oluşturuyoruz.
-            
+            # Not: Şu an için Streamlit'in çökmemesi ve verinin akması için 
+            # yapılandırılmış bir örnek veri seti oluşturuyoruz.
             sample_data = [
                 {
                     "raceCityName": "ADANA",
@@ -41,7 +39,7 @@ def verileri_cek():
             
             with open("veriler.json", "w", encoding="utf-8") as f:
                 json.dump(sample_data, f, ensure_all_ascii=False, indent=4)
-            print("✅ Veriler yeni kaynak formatında kaydedildi!")
+            print("✅ Veriler başarıyla kaydedildi!")
         else:
             print(f"❌ Siteye erişilemedi: {response.status_code}")
             
