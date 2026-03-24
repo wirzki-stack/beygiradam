@@ -4,26 +4,27 @@ import json
 import os
 
 st.set_page_config(page_title="BEYGİR ADAM v60", layout="wide")
-st.title("🏇 BEYGİR ADAM - CANLI BÜLTEN")
+st.markdown("<h1 style='text-align:center; color:#FF8C00;'>🏇 BEYGİR ADAM | YENİ NESİL</h1>", unsafe_allow_html=True)
 
 if not os.path.exists("veriler.json"):
-    st.warning("⚠️ Veri dosyası bekleniyor... Lütfen GitHub Actions'ı çalıştırın.")
+    st.info("⌛ Veriler hazırlanıyor... Lütfen Actions sekmesinden robotu çalıştırın.")
     st.stop()
 
 try:
     with open("veriler.json", "r", encoding="utf-8") as f:
         data = json.load(f)
 
-    if data:
-        cities = list(set([r['raceCityName'] for r in data]))
-        selected_city = st.sidebar.selectbox("📍 Şehir Seç", cities)
+    if data and len(data) > 0:
+        sehirler = sorted(list(set([r['raceCityName'] for r in data])))
+        secilen = st.sidebar.selectbox("📍 Şehir Seçin", sehirler)
         
-        races = [r for r in data if r['raceCityName'] == selected_city]
+        races = [r for r in data if r['raceCityName'] == secilen]
         for race in races:
-            with st.expander(f"🏁 {race['raceNumber']}. Koşu - {race['raceTime']}", expanded=True):
+            with st.expander(f"🏁 {race['raceNumber']}. Koşu - Saat: {race['raceTime']}", expanded=True):
                 df = pd.DataFrame(race['raceEntries'])
                 st.table(df)
     else:
-        st.error("Bülten verisi şu an için işlenemedi.")
+        st.warning("⚠️ Bülten şu an boş. Robotun veriyi çektiğinden emin olun.")
+
 except Exception as e:
-    st.error(f"Sistem Hatası: {e}")
+    st.error(f"❌ Görüntüleme Hatası: {e}")
