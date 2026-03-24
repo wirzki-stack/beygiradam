@@ -1,35 +1,29 @@
-import streamlit as st
-import pandas as pd
-import json
-import os
+name: TJK Data Scraper
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch: 
 
-st.set_page_config(page_title="BEYGİR ADAM | V52", layout="wide")
+permissions:
+  contents: write
 
-st.markdown("<h1 style='text-align:center; color:#FF8C00;'>🏇 BEYGİR ADAM v52.0</h1>", unsafe_allow_html=True)
-
-file_path = "veriler.json"
-
-# BEYAZ EKRAN KATİLİ: Dosya yoksa burada her şeyi durdur
-if not os.path.exists(file_path):
-    st.error("🚨 DOSYA BULUNAMADI: veriler.json dosyası reponda yok.")
-    st.info("GitHub Actions'ta YEŞİL TİK olduğundan emin olun.")
-    st.stop() 
-
-try:
-    with open(file_path, "r", encoding="utf-8") as f:
-        data = json.load(f)
-    
-    if data:
-        sehirler = sorted(list(set([r.get('raceCityName') for r in data if r.get('raceCityName')])))
-        secilen = st.sidebar.selectbox("📍 Şehir Seçin:", sehirler)
-        
-        races = [r for r in data if r.get('raceCityName') == secilen]
-        for race in races:
-            with st.expander(f"🏁 {secilen} - {race.get('raceNumber')}. KOŞU", expanded=True):
-                entries = race.get('raceEntries', [])
-                if entries:
-                    df = pd.DataFrame([{"At": e['horseName'], "Jokey": e['jockeyName'], "HP": e['handicapScore'] or 0} for e in entries])
-                    df["Skor"] = df["HP"].apply(lambda x: f"%{min(int(x*0.7+15), 99)}" if x > 0 else "%--")
-                    st.table(df.sort_values(by="HP", ascending=False))
-except Exception as e:
-    st.error(f"⚠️ Hata: {e}")
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Python Kur
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+      - name: Kütüphaneleri Yükle
+        run: pip install requests
+      - name: Veriyi Çek
+        run: python scraper.py
+      - name: Veriyi Kaydet
+        run: |
+          git config --global user.name "GitHub Action Bot"
+          git config --global user.email "action@github.com"
+          git add veriler.json
+          git commit -m "📊 Veri Guncellendi" || echo "Degisiklik yok"
+          git push origin main
