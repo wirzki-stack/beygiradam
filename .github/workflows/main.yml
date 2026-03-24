@@ -23,18 +23,18 @@ jobs:
       - name: Kutuphaneleri Yukle
         run: |
           python -m pip install --upgrade pip
-          pip install requests beautifulsoup4
+          pip install requests
           
       - name: Veriyi Cek
         run: python scraper.py
         
-      - name: GitHub'a Gonder
+      - name: GitHub'a Gonder (Zorla)
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add veriler.json
-          # Eğer değişiklik yoksa hata vermeden devam et
+          # Eğer değişiklik yoksa hata vermeden devam etmesini sağlar
           git commit -m "📊 Otomatik Bülten Güncelleme" || exit 0
-          # Çakışmaları önlemek için önce çek (pull) sonra zorla (push)
+          # Çakışmaları önlemek için önce çek, sonra üzerine yaz
           git pull origin main --rebase
           git push origin main
