@@ -24,7 +24,7 @@ try:
                 df = pd.DataFrame(race['raceEntries'])
                 st.table(df)
     else:
-        st.warning("⚠️ Bülten şu an boş. Robotun veriyi çektiğinden emin olun.")
+        st.warning("⚠️ Bülten şu an boş görünüyor.")
 
 except Exception as e:
     st.error(f"❌ Görüntüleme Hatası: {e}")
