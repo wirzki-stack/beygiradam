@@ -3,48 +3,51 @@ import pandas as pd
 import json
 import os
 
-# Sayfa donmasını engellemek için en temel ayar
-st.set_page_config(page_title="BEYGİR ADAM | V45", layout="wide")
+# Sayfa donmasını engellemek için en temel ayarlar
+st.set_page_config(page_title="BEYGİR ADAM | V46", layout="wide")
 
-st.markdown("<h1 style='text-align:center; color:#FF8C00;'>🏇 BEYGİR ADAM v45.0</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align:center; color:#FF8C00;'>🏇 BEYGİR ADAM v46.0</h1>", unsafe_allow_html=True)
 st.divider()
 
-# DOSYA KONTROLÜ
 file_path = "veriler.json"
 
+# DOSYA VAR MI KONTROLÜ
 if not os.path.exists(file_path):
-    st.error("🚨 KRİTİK HATA: veriler.json dosyası henüz oluşturulmamış!")
-    st.info("Bu beyaz ekranın geçmesi için GitHub'da robotu (Actions) bir kez çalıştırmanız şart.")
-    st.markdown("""
-    **Nasıl Düzeltilir?**
-    1. GitHub sayfana git.
-    2. **Actions** sekmesine tıkla.
-    3. **TJK Data Scraper** -> **Run workflow** de.
-    4. Yeşil tik olunca burayı yenile.
-    """)
-    st.stop() # Uygulamayı burada dondurarak beyaz ekranı kırıyoruz
+    st.error("🚨 DOSYA BULUNAMADI: veriler.json henüz oluşturulmamış.")
+    st.stop()
 
-# VERİ YÜKLEME
-try:
-    with open(file_path, "r", encoding="utf-8") as f:
-        data = json.load(f)
+# VERİ YÜKLEME FONKSİYONU
+@st.cache_data(ttl=300)
+def load_data():
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            content = f.read()
+            if not content:
+                return "BOŞ"
+            return json.loads(content)
+    except Exception as e:
+        return f"HATA: {str(e)}"
+
+data = load_data()
+
+# DURUM KONTROLÜ
+if data == "BOŞ":
+    st.warning("⚠️ Dosya bulundu ama içi boş. Robot (Action) veriyi yazamamış.")
+    st.stop()
+elif isinstance(data, str) and "HATA" in data:
+    st.error(data)
+    st.stop()
+
+# GÖRÜNTÜLEME
+if data:
+    sehirler = sorted(list(set([r.get('raceCityName') for r in data if r.get('raceCityName')])))
+    secilen = st.sidebar.selectbox("📍 Şehir Seçin:", sehirler)
     
-    if data:
-        sehirler = sorted(list(set([r.get('raceCityName') for r in data if r.get('raceCityName')])))
-        secilen_sehir = st.sidebar.selectbox("📍 Şehir Seçin:", sehirler)
-        
-        if st.sidebar.button("📊 ANALİZLERİ GÖSTER"):
-            races = [r for r in data if r.get('raceCityName') == secilen_sehir]
-            for race in races:
-                st.subheader(f"🏁 {secilen_sehir} - {race.get('raceNumber')}. KOŞU")
-                entries = race.get('raceEntries', [])
-                if entries:
-                    df = pd.DataFrame([{"At": e['horseName'], "Jokey": e['jockeyName'], "HP": e['handicapScore'] or 0} for e in entries])
-                    df["Skor"] = df["HP"].apply(lambda x: f"%{min(int(x*0.7+15), 99)}" if x > 0 else "%--")
-                    st.table(df.sort_values(by="HP", ascending=False))
-                st.divider()
-    else:
-        st.warning("⚠️ Veri dosyası boş. Robot veriyi çekememiş.")
-
-except Exception as e:
-    st.error(f"❌ Sistem Hatası: {e}")
+    races = [r for r in data if r.get('raceCityName') == secilen]
+    for race in races:
+        with st.expander(f"🏁 {secilen} - {race.get('raceNumber')}. KOŞU", expanded=True):
+            entries = race.get('raceEntries', [])
+            if entries:
+                df = pd.DataFrame([{"At": e['horseName'], "Jokey": e['jockeyName'], "HP": e['handicapScore'] or 0} for e in entries])
+                df["Skor"] = df["HP"].apply(lambda x: f"%{min(int(x*0.7+15), 99)}" if x > 0 else "%--")
+                st.table(df.sort_values(by="HP", ascending=False))
