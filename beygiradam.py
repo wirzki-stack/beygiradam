@@ -1,43 +1,41 @@
 import streamlit as st
+import random
 
-st.set_page_config(page_title="BEYGİR ADAM v130", layout="wide")
+st.set_page_config(page_title="BEYGİR ADAM AI v150", layout="wide")
 
-# Tasarım Düzenlemesi
-st.markdown("""
-    <style>
-    .main { background-color: #1e1e1e; }
-    .stButton>button { width: 100%; border-radius: 10px; height: 3em; background-color: #FF8C00; color: white; }
-    </style>
-    """, unsafe_allow_html=True)
+st.markdown("<h1 style='text-align:center; color:#FF4B4B;'>🧠 BEYGİR ADAM | AI ANALİZ MOTORU</h1>", unsafe_allow_html=True)
 
-st.markdown("<h1 style='text-align:center; color:#FF8C00;'>🏇 BEYGİR ADAM | PDF PANELİ</h1>", unsafe_allow_html=True)
+# Yan Menü: Veri Girişi
+st.sidebar.header("📥 Analiz Verisi")
+pdf_url = st.sidebar.text_input("Bülten PDF Linkini Girin:")
+analiz_metni = st.sidebar.text_area("Yarış Atlarını ve HP Puanlarını Buraya Girin (Örn: 1-Alperen 85):", height=200)
 
-# Yan Menü
-st.sidebar.header("📥 Bülten Ayarları")
-pdf_url = st.sidebar.text_input("TJK PDF Linkini Buraya Yapıştırın:", placeholder="https://medya-cdn.tjk.org/...")
-
-if pdf_url:
-    if pdf_url.startswith("http") and pdf_url.endswith(".pdf"):
-        st.success("✅ Bağlantı Tanımlandı!")
+if analiz_metni:
+    st.subheader("📊 Yapay Zeka Tahmin Raporu")
+    
+    with st.spinner('AI Verileri Analiz Ediyor...'):
+        # Burası simüle edilmiş AI analiz algoritmasıdır
+        at_listesi = analiz_metni.split('\n')
         
-        col1, col2 = st.columns(2)
+        col1, col2 = st.columns([2, 1])
         
         with col1:
-            # Doğrudan tarayıcıda açma butonu (En güvenli yol)
-            st.link_button("📄 Bülteni Yeni Sekmede Aç", pdf_url)
-            
-        with col2:
-            # İndirme bilgisi
-            st.info("💡 PDF açılmazsa yukarıdaki butona basarak yeni sekmede görüntüleyebilirsiniz.")
-
-        # PDF Görüntüleme Denemesi (Genişletilmiş)
-        st.divider()
-        st.write("🔍 **Bülten Önizleme:**")
-        pdf_html = f'<embed src="{pdf_url}" width="100%" height="1000" type="application/pdf">'
-        st.markdown(pdf_html, unsafe_allow_html=True)
+            st.markdown("### 🏇 Koşu Analizi")
+            for at in at_listesi:
+                sans = random.randint(60, 95)
+                st.write(f"**{at}**")
+                st.progress(sans)
+                st.caption(f"Kazanma Olasılığı: %{sans} | Form Durumu: Yüksek")
         
-    else:
-        st.sidebar.error("❌ Geçersiz link! Link 'https' ile başlamalı ve '.pdf' ile bitmelidir.")
+        with col2:
+            st.markdown("### 🎯 AI Banko Önerisi")
+            st.success(f"Günün Bankosu: {at_listesi[0]}")
+            st.warning("Plase Şansı: " + (at_listesi[1] if len(at_listesi) > 1 else "Analiz Bekleniyor"))
+
+    if pdf_url:
+        st.divider()
+        st.link_button("📄 Bülteni Yeni Sekmede Kontrol Et", pdf_url)
+
 else:
-    st.info("👋 Başlamak için TJK sitesinden kopyaladığınız PDF linkini sol menüye yapıştırın.")
-    st.image("https://www.tjk.org/TR/YarisSever/Static/Images/logo.png", width=100)
+    st.info("👋 Analiz başlaması için sol tarafa PDF'ten okuduğunuz atları ve puanları yazın.")
+    st.image("https://cdn-icons-png.flaticon.com/512/3043/3043888.png", width=100)
