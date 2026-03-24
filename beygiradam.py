@@ -1,27 +1,33 @@
-import streamlit as st
-import pandas as pd
+import requests
 import json
-import os
+from datetime import datetime
 
-st.set_page_config(page_title="BEYGİR ADAM | FINAL", page_icon="🏇", layout="wide")
+def fetch_and_save():
+    # TJK'nın en güncel servis ucu
+    today = datetime.now().strftime("%d-%m-%Y")
+    url = f"https://online.tjk.org/tjkproxy/api/race-program/daily-races/{today}"
+    
+    # Gerçek bir mobil uygulama gibi görünmek için "Hacker" kimliği
+    headers = {
+        "User-Agent": "TJK Mobil/3.2.1 (iPhone; iOS 16.5)",
+        "X-Requested-With": "com.tjk.tjk_mobil",
+        "Accept": "application/json"
+    }
+    
+    try:
+        r = requests.get(url, headers=headers, timeout=30)
+        if r.status_code == 200:
+            data = r.json()
+            if data:
+                with open("veriler.json", "w", encoding="utf-8") as f:
+                    json.dump(data, f, ensure_ascii=False, indent=4)
+                print("✅ SIZMA BAŞARILI: Veriler JSON dosyasına işlendi.")
+            else:
+                print("⚠️ UYARI: Bağlantı kuruldu ama bülten boş döndü.")
+        else:
+            print(f"❌ HATA: TJK Erişimi Reddedildi (Kod: {r.status_code})")
+    except Exception as e:
+        print(f"❌ KRİTİK HATA: {e}")
 
-# --- UI ---
-st.markdown("<h1 style='text-align:center; color:#FF8C00;'>🏆 BEYGİR ADAM v41.0 (Hacker Safe)</h1>", unsafe_allow_html=True)
-
-if not os.path.exists("veriler.json"):
-    st.error("⚠️ Veri dosyası henüz oluşturulmadı. GitHub Actions'ın ilk çalışmasını bekleyin veya manuel tetikleyin.")
-else:
-    with open("veriler.json", "r", encoding="utf-8") as f:
-        data = json.load(f)
-
-    sehirler = list(set([r.get('raceCityName') for r in data]))
-    secilen = st.sidebar.selectbox("Şehir Seç:", sehirler)
-
-    if st.sidebar.button("ANALİZ ET"):
-        races = [r for r in data if r.get('raceCityName') == secilen]
-        for race in races:
-            st.subheader(f"🏁 {secilen} - {race.get('raceNumber')}. KOŞU")
-            entries = race.get('raceEntries', [])
-            df = pd.DataFrame([{"At": e['horseName'], "Jokey": e['jockeyName'], "HP": e['handicapScore'] or 0} for e in entries])
-            df["Skor"] = df["HP"].apply(lambda x: f"%{min(int(x*0.7+15), 99)}" if x > 0 else "%--")
-            st.dataframe(df.sort_values(by="HP", ascending=False), use_container_width=True, hide_index=True)
+if __name__ == "__main__":
+    fetch_and_save()
