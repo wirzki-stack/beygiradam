@@ -13,7 +13,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          persist-credentials: true # Yetkiyi kalıcı hale getirir
+          persist-credentials: true
       
       - name: Python Kur
         uses: actions/setup-python@v5
