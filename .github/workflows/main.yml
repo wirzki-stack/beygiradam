@@ -13,7 +13,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0 # Tüm geçmişi çek ki çakışma olmasın
       
       - name: Python Kurulumu
         uses: actions/setup-python@v5
@@ -28,18 +28,18 @@ jobs:
       - name: Veriyi Cek
         run: python scraper.py
         
-      - name: GitHub'a Gonder (Kesin Cozum)
+      - name: GitHub'a Gonder
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           
-          # Mevcut degisiklikleri cek ve cakismalari onlemek icin rebase yap
+          # Çakışmaları önlemek için önce uzak sunucudaki (senin yaptığın) değişiklikleri çek
           git pull origin main --rebase
           
           git add veriler.json
           
-          # Eger dosya degismediyse hata vermeden bitir
+          # Eğer dosya değişmediyse hata vermeden bitir (Exit Code 0)
           git commit -m "📊 Otomatik Bülten Güncelleme" || exit 0
           
-          # Reddedilmeyi onlemek icin zorla gonder (force push)
-          git push origin main --force
+          # Şimdi güvenle gönder
+          git push origin main
