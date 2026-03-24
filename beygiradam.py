@@ -1,65 +1,75 @@
 import streamlit as st
 import pandas as pd
 import json
-import os
+from fpdf import FPDF
+import io
 
-st.set_page_config(page_title="BEYGİR ADAM v95", layout="wide")
-st.title("🏇 BEYGİR ADAM | GÜVENLİ MOD")
+st.set_page_config(page_title="BEYGİR ADAM PDF v100", layout="wide")
+st.title("🏇 BEYGİR ADAM | PDF BÜLTEN")
 
-# Sol Menü: Veri Girişi
-st.sidebar.header("📥 Manuel Veri Girişi")
-manuel_json = st.sidebar.text_area("TJK'dan aldığınız JSON verisini buraya yapıştırın:", height=300)
-
-data = []
+# Manuel Veri Girişi
+manuel_json = st.sidebar.text_area("JSON Verisini Buraya Yapıştırın:", height=200)
 
 if manuel_json:
     try:
         data = json.loads(manuel_json)
-        # TJK API yapısına göre ayıkla
-        if isinstance(data, dict):
-            # TJK API genellikle veriyi 'data' veya 'QueryResult' anahtarı içinde verir
-            data = data.get('data', data.get('QueryResult', data.get('races', [])))
+        if isinstance(data, dict): data = data.get('data', [])
         
-        # Eğer hala liste değilse, doğrudan kendisi olabilir
-        if not isinstance(data, list):
-            data = []
-            
-        st.sidebar.success("✅ Veri Yüklendi!")
-    except:
-        st.sidebar.error("❌ Geçersiz JSON formatı.")
-else:
-    # Veri yoksa dosyadan oku
-    if os.path.exists("veriler.json"):
-        with open("veriler.json", "r", encoding="utf-8") as f:
-            try:
-                data = json.load(f)
-            except: data = []
-
-# Görüntüleme
-if data and isinstance(data, list):
-    try:
+        # Şehir Seçimi
         cities = sorted(list(set([r.get('raceCityName') for r in data if r.get('raceCityName')])))
-        if cities:
-            selected_city = st.selectbox("📍 Şehir Seçin", cities)
+        selected_city = st.selectbox("📍 Şehir Seçin", cities)
+        
+        city_races = [r for r in data if r.get('raceCityName') == selected_city]
+
+        # PDF OLUŞTURMA FONKSİYONU
+        def create_pdf(city_name, races):
+            pdf = FPDF()
+            pdf.add_page()
+            pdf.set_font("Arial", "B", 16)
+            pdf.cell(200, 10, f"{city_name} YARIS BULTENI", ln=True, align="C")
+            pdf.ln(10)
+
+            for r in races:
+                pdf.set_font("Arial", "B", 12)
+                pdf.cell(0, 10, f"{r['raceNumber']}. Kosu - Saat: {r['raceTime']}", ln=True)
+                pdf.set_font("Arial", "", 10)
+                
+                # Tablo Başlıkları
+                pdf.cell(10, 8, "No", 1)
+                pdf.cell(60, 8, "At Adi", 1)
+                pdf.cell(60, 8, "Jokey", 1)
+                pdf.cell(20, 8, "Kilo", 1)
+                pdf.cell(20, 8, "HP", 1)
+                pdf.ln()
+
+                for entry in r.get('raceEntries', []):
+                    pdf.cell(10, 8, str(entry.get('programNumber','')), 1)
+                    pdf.cell(60, 8, str(entry.get('horseName',''))[:25], 1)
+                    pdf.cell(60, 8, str(entry.get('jockeyName',''))[:25], 1)
+                    pdf.cell(20, 8, str(entry.get('weight','')), 1)
+                    pdf.cell(20, 8, str(entry.get('handicapScore','')), 1)
+                    pdf.ln()
+                pdf.ln(5)
             
-            city_races = [r for r in data if r.get('raceCityName') == selected_city]
-            for r in city_races:
-                with st.expander(f"🏁 {r.get('raceNumber')}. Koşu - {r.get('raceTime')}"):
-                    entries = r.get('raceEntries', [])
-                    if entries:
-                        df = pd.DataFrame(entries)
-                        cols = {'programNumber': 'No', 'horseName': 'At Adı', 'jockeyName': 'Jokey', 'weight': 'Kilo', 'handicapScore': 'HP'}
-                        # Mevcut sütunları kontrol et
-                        present_cols = [c for c in cols.keys() if c in df.columns]
-                        if present_cols:
-                            df_display = df[present_cols].rename(columns=cols)
-                            # HP varsa ona göre sırala
-                            if 'HP' in df_display.columns:
-                                df_display = df_display.sort_values(by='HP', ascending=False)
-                            st.table(df_display)
-        else:
-            st.warning("Veri formatı doğru ama içinde şehir bilgisi bulunamadı.")
+            return pdf.output(dest='S').encode('latin-1')
+
+        # PDF İndirme Butonu
+        if st.button(f"📥 {selected_city} Bültenini PDF Yap"):
+            pdf_bytes = create_pdf(selected_city, city_races)
+            st.download_button(
+                label="📄 PDF Dosyasını İndir",
+                data=pdf_bytes,
+                file_name=f"{selected_city}_Bulten.pdf",
+                mime="application/pdf"
+            )
+
+        # Ekranda Gösterim
+        for r in city_races:
+            with st.expander(f"🏁 {r['raceNumber']}. Koşu - {r['raceTime']}"):
+                df = pd.DataFrame(r['raceEntries'])
+                st.table(df[['programNumber', 'horseName', 'jockeyName', 'weight', 'handicapScore']])
+                
     except Exception as e:
-        st.error(f"Görüntüleme hatası: {e}")
+        st.error(f"Hata: {e}")
 else:
-    st.info("👋 Hoş geldiniz! TJK robotları engellediği için lütfen sol menüdeki alana bülten verisini yapıştırın.")
+    st.info("Bülteni PDF'e çevirmek için JSON verisini sola yapıştırın.")
