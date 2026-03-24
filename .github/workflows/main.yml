@@ -1,0 +1,33 @@
+name: TJK Data Scraper
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch: 
+
+permissions:
+  contents: write # Robotun dosya yazması için gereken anahtar
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Python Kur
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+          
+      - name: Kütüphaneleri Yükle
+        run: pip install requests
+        
+      - name: Veriyi Çek
+        run: python scraper.py
+        
+      - name: Veriyi Kaydet ve Gönder
+        run: |
+          git config --global user.name "GitHub Action Bot"
+          git config --global user.email "action@github.com"
+          git add veriler.json
+          git commit -m "📊 Otomatik Veri Güncelleme: $(date)" || echo "Değişiklik yok"
+          git push origin main
