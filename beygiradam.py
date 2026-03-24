@@ -1,44 +1,85 @@
 import streamlit as st
+import requests
+import io
+import re
 import pandas as pd
+import random
 
-st.set_page_config(page_title="BEYGİR ADAM AI v300", layout="wide")
+# PDF okuyucu kütüphanesi
+try:
+    import PyPDF2
+except ImportError:
+    st.error("HATA: Lütfen requirements.txt dosyasına 'PyPDF2' ekleyin!")
 
-st.markdown("<h1 style='text-align:center; color:#FF4B4B;'>🏇 BEYGİR ADAM | AKILLI ANALİZ</h1>", unsafe_allow_html=True)
+st.set_page_config(page_title="BEYGİR ADAM AI v400", layout="wide")
 
-# Yan Menü
-st.sidebar.header("📊 Veri Girişi")
-st.sidebar.info("PDF'ten gördüğünüz At No ve Puanları (HP) aralarında boşluk bırakarak yazın.")
+# Şık Arayüz
+st.markdown("<h1 style='text-align:center; color:#00FF00;'>🏇 BEYGİR ADAM | OTOMATİK LİNK ANALİZİ</h1>", unsafe_allow_html=True)
 
-# Her ayak için giriş kutuları
-tahminler = {}
-for i in range(1, 7):
-    tahminler[i] = st.sidebar.text_input(f"{i}. Ayak (Örn: 1 85, 2 74, 5 90):", key=f"ayak_{i}")
+# Yan Menü: Sadece Link
+pdf_url = st.sidebar.text_input("🔗 TJK PDF Bülten Linkini Yapıştırın:", placeholder="https://medya-cdn.tjk.org/...")
+analiz_buton = st.sidebar.button("🚀 Bülteni Çek ve Ayak Ayak Analiz Et")
 
-if st.sidebar.button("🚀 Altılıyı Analiz Et"):
-    st.success("✅ Analiz Tamamlandı! İşte Yapay Zeka Sıralaması:")
-    
-    cols = st.columns(3) # 2 satırda 3'er kolon (Toplam 6 ayak)
-    for i in range(1, 7):
-        with cols[(i-1)%3]:
-            st.markdown(f"### 🏁 {i}. AYAK")
-            data = tahminler[i]
-            if data:
-                try:
-                    # Girişi işle: "1 85, 2 74" -> Listeye çevir
-                    items = [x.strip().split() for x in data.split(',')]
-                    df = pd.DataFrame(items, columns=['No', 'HP'])
-                    df['HP'] = pd.to_numeric(df['HP'])
+if pdf_url and analiz_buton:
+    with st.spinner('AI bültene bağlanıyor ve tüm ayakları analiz ediyor...'):
+        try:
+            # 1. PDF'i Linkten Çek
+            response = requests.get(pdf_url, timeout=20)
+            pdf_file = io.BytesIO(response.content)
+            reader = PyPDF2.PdfReader(pdf_file)
+            
+            # 2. Tüm Metni Oku
+            full_text = ""
+            for page in reader.pages:
+                text = page.extract_text()
+                if text:
+                    full_text += text + "\n"
+
+            # 3. Koşuları (Ayakları) Tespit Et
+            # TJK PDF'lerinde genellikle "1. KOŞU", "2. KOŞU" başlıkları kullanılır
+            kosu_bloklari = re.split(r"(\d+)\.\s*KOŞU", full_text)
+
+            if len(kosu_bloklari) > 1:
+                st.success(f"✅ Analiz Başarılı! {len(kosu_bloklari)//2} Koşu Tespit Edildi.")
+                
+                # Her Koşu İçin Analiz Başlat
+                for i in range(1, len(kosu_bloklari), 2):
+                    kosu_no = kosu_bloklari[i]
+                    icerik = kosu_bloklari[i+1]
                     
-                    # Sırala ve Olasılık Hesapla
-                    df = df.sort_values(by='HP', ascending=False)
-                    toplam = df['HP'].sum()
-                    df['Şans %'] = df['HP'].apply(lambda x: round((x/toplam)*100, 1))
+                    # At No, İsim ve Handikap Puanı (HP) ayıkla
+                    # Regex: Satır başı rakam + Büyük Harfli İsim + Aradaki karmaşa + Sondaki 2-3 haneli HP
+                    atlar = re.findall(r"(\d{1,2})\s+([A-ZÇĞİÖŞÜ ]{4,25})\s+.*?(\d{2,3})", icerik)
                     
-                    st.table(df[['No', 'Şans %']])
-                    st.write(f"🏆 **Banko:** {df.iloc[0]['No']} Numara")
-                except:
-                    st.error("Hatalı format! (Örn: 1 85, 2 70)")
+                    if atlar:
+                        df = pd.DataFrame(atlar, columns=['No', 'At İsmi', 'HP'])
+                        df['HP'] = pd.to_numeric(df['HP'], errors='coerce')
+                        # Hatalı puanları ve 100 üstünü temizle, HP'ye göre sırala
+                        df = df[(df['HP'] > 20) & (df['HP'] <= 100)].sort_values(by='HP', ascending=False)
+                        df = df.drop_duplicates(subset=['At İsmi'])
+
+                        # Her Ayak İçin Ayrı Kutu (Expander)
+                        with st.expander(f"🏁 {kosu_no}. AYAK ANALİZİ (Favoriden Sürprize Sıralı)"):
+                            c1, c2 = st.columns([2, 1])
+                            with c1:
+                                st.write("**📊 AI Kazanma Olasılığı Sıralaması:**")
+                                # Olasılık hesapla (Basit AI Mantığı)
+                                toplam_hp = df['HP'].sum()
+                                df['Şans %'] = df['HP'].apply(lambda x: f"%{round((x/toplam_hp)*100, 1)}")
+                                st.table(df[['No', 'At İsmi', 'Şans %']])
+                            
+                            with c2:
+                                if not df.empty:
+                                    banko = df.iloc[0]['At İsmi']
+                                    st.metric("🏆 AYAK BANKOSU", banko)
+                                    st.write(f"🥈 **Plase:** {df.iloc[1]['At İsmi'] if len(df)>1 else '---'}")
+                                    st.write(f"🥉 **Sürpriz:** {df.iloc[2]['At İsmi'] if len(df)>2 else '---'}")
+                    else:
+                        st.warning(f"{kosu_no}. Koşu için at verisi ayrıştırılamadı.")
             else:
-                st.write("Veri girilmedi.")
+                st.error("❌ PDF içinde '1. KOŞU' formatında başlık bulunamadı. Linki kontrol edin.")
+
+        except Exception as e:
+            st.error(f"⚠️ Bağlantı veya Okuma Hatası: {e}")
 else:
-    st.info("👋 Başlamak için sol taraftaki kutulara PDF'ten okuduğunuz at numaralarını ve puanlarını yazıp butona basın.")
+    st.info("👋 TJK sitesinden kopyaladığınız PDF linkini yapıştırın, 'Analiz Et'e basın. Gerisini AI halletsin!")
