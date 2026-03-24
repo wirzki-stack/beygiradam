@@ -1,68 +1,44 @@
 import streamlit as st
 import pandas as pd
-import re
 
-st.set_page_config(page_title="BEYGİR ADAM AI v290", layout="wide")
+st.set_page_config(page_title="BEYGİR ADAM AI v300", layout="wide")
 
-# Tasarım Ayarları
-st.markdown("""
-    <style>
-    .main { background-color: #0e1117; }
-    .stExpander { border: 1px solid #00FF00; border-radius: 10px; margin-bottom: 10px; }
-    </style>
-    """, unsafe_allow_html=True)
+st.markdown("<h1 style='text-align:center; color:#FF4B4B;'>🏇 BEYGİR ADAM | AKILLI ANALİZ</h1>", unsafe_allow_html=True)
 
-st.markdown("<h1 style='text-align:center; color:#00FF00;'>🧠 BEYGİR ADAM | AI AYAK ANALİZİ</h1>", unsafe_allow_html=True)
+# Yan Menü
+st.sidebar.header("📊 Veri Girişi")
+st.sidebar.info("PDF'ten gördüğünüz At No ve Puanları (HP) aralarında boşluk bırakarak yazın.")
 
-# Yan Menü: Veri Girişi
-st.sidebar.header("📥 Veri Merkezi")
-raw_text = st.sidebar.text_area("TJK Bültenini Buraya Yapıştırın:", height=400)
-analiz_et = st.sidebar.button("🚀 Tüm Ayakları Analiz Et")
+# Her ayak için giriş kutuları
+tahminler = {}
+for i in range(1, 7):
+    tahminler[i] = st.sidebar.text_input(f"{i}. Ayak (Örn: 1 85, 2 74, 5 90):", key=f"ayak_{i}")
 
-if raw_text and analiz_et:
-    # Koşuları (Ayakları) Böl
-    kosu_bloklari = re.split(r"(\d+)\.\s*KOŞU", raw_text)
+if st.sidebar.button("🚀 Altılıyı Analiz Et"):
+    st.success("✅ Analiz Tamamlandı! İşte Yapay Zeka Sıralaması:")
     
-    if len(kosu_bloklari) > 1:
-        st.success(f"✅ {len(kosu_bloklari)//2} Ayak Tespit Edildi. Sıralama Hazırlanıyor...")
-        
-        for i in range(1, len(kosu_bloklari), 2):
-            kosu_no = kosu_bloklari[i]
-            icerik = kosu_bloklari[i+1]
-            
-            # At No, İsim ve HP Puanı Yakala
-            # Regex: (No) (İSİM) ... (HP)
-            at_verileri = re.findall(r"(\d{1,2})\s+([A-ZÇĞİÖŞÜ ]{3,25})\s+.*?(\d{2,3})", icerik)
-            
-            if at_verileri:
-                df = pd.DataFrame(at_verileri, columns=['No', 'At İsmi', 'HP'])
-                df['HP'] = pd.to_numeric(df['HP'], errors='coerce')
-                # Sadece gerçek HP puanlarını al (20-100 arası) ve Sırala
-                df = df[(df['HP'] > 20) & (df['HP'] <= 100)].sort_values(by='HP', ascending=False)
-                df = df.drop_duplicates(subset=['At İsmi'])
-
-                with st.expander(f"🏁 {kosu_no}. AYAK - AI Tahminleri (Sıralı Listesi)"):
-                    if not df.empty:
-                        # Olasılık Hesapla
-                        toplam = df['HP'].sum()
-                        df['Kazanma Şansı'] = df['HP'].apply(lambda x: f"%{round((x/toplam)*100, 1)}")
-                        
-                        col1, col2 = st.columns([2, 1])
-                        with col1:
-                            st.write("**📊 Olasılık Sıralaması (Favoriden Sürprize):**")
-                            st.table(df[['No', 'At İsmi', 'HP', 'Kazanma Şansı']])
-                        
-                        with col2:
-                            banko = df.iloc[0]['At İsmi']
-                            st.metric("🏆 AYAK BANKOSU", banko)
-                            st.progress(int(df.iloc[0]['HP']) / 100)
-                            if len(df) > 1:
-                                st.write(f"🥈 **Plase:** {df.iloc[1]['At İsmi']}")
-                            if len(df) > 2:
-                                st.write(f"🥉 **Sürpriz:** {df.iloc[2]['At İsmi']}")
-                    else:
-                        st.warning("Bu ayakta analiz edilecek uygun veri bulunamadı.")
-    else:
-        st.error("❌ '1. KOŞU' formatında başlık bulunamadı. Lütfen bülteni tam kopyalayın.")
+    cols = st.columns(3) # 2 satırda 3'er kolon (Toplam 6 ayak)
+    for i in range(1, 7):
+        with cols[(i-1)%3]:
+            st.markdown(f"### 🏁 {i}. AYAK")
+            data = tahminler[i]
+            if data:
+                try:
+                    # Girişi işle: "1 85, 2 74" -> Listeye çevir
+                    items = [x.strip().split() for x in data.split(',')]
+                    df = pd.DataFrame(items, columns=['No', 'HP'])
+                    df['HP'] = pd.to_numeric(df['HP'])
+                    
+                    # Sırala ve Olasılık Hesapla
+                    df = df.sort_values(by='HP', ascending=False)
+                    toplam = df['HP'].sum()
+                    df['Şans %'] = df['HP'].apply(lambda x: round((x/toplam)*100, 1))
+                    
+                    st.table(df[['No', 'Şans %']])
+                    st.write(f"🏆 **Banko:** {df.iloc[0]['No']} Numara")
+                except:
+                    st.error("Hatalı format! (Örn: 1 85, 2 70)")
+            else:
+                st.write("Veri girilmedi.")
 else:
-    st.info("👋 Başlamak için TJK bülten metnini kopyalayıp sol tarafa yapıştırın ve butona basın.")
+    st.info("👋 Başlamak için sol taraftaki kutulara PDF'ten okuduğunuz at numaralarını ve puanlarını yazıp butona basın.")
