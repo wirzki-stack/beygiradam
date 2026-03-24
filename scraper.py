@@ -9,14 +9,16 @@ def verileri_cek():
     url = f"https://api.tjk.org/v1/race/program/{bugun}"
     
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        "Accept": "application/json"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+        "Accept": "application/json",
+        "Origin": "https://www.tjk.org",
+        "Referer": "https://www.tjk.org/"
     }
 
     try:
-        print(f"🔗 TJK API'den veri çekiliyor: {bugun}")
+        print(f"🔗 TJK API Bağlantısı Deneniyor: {bugun}")
         # timeout ekleyerek robotun sonsuza kadar beklemesini ve hata vermesini engelliyoruz
-        response = requests.get(url, headers=headers, timeout=15)
+        response = requests.get(url, headers=headers, timeout=25)
         
         if response.status_code == 200:
             data = response.json()
@@ -25,14 +27,14 @@ def verileri_cek():
             
             with open("veriler.json", "w", encoding="utf-8") as f:
                 json.dump(final_data, f, ensure_all_ascii=False, indent=4)
-            print("✅ BAŞARILI: Veri kaydedildi.")
+            print(f"✅ BAŞARILI: {len(final_data)} kayıt kaydedildi.")
         else:
             print(f"❌ API Hatası: {response.status_code}. Boş dosya oluşturuluyor.")
             with open("veriler.json", "w") as f: json.dump([], f)
             
     except Exception as e:
         print(f"⚠️ Hata: {e}. Sistemin çökmemesi için boş dosya oluşturuldu.")
-        # Dosya yoksa bile oluştur ki hata vermesin
+        # Dosya yoksa bile oluştur ki uygulama hata vermesin
         if not os.path.exists("veriler.json"):
             with open("veriler.json", "w") as f: json.dump([], f)
 
