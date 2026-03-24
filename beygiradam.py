@@ -4,9 +4,9 @@ import json
 import os
 
 # Sayfa donmasını engellemek için temel ayarlar
-st.set_page_config(page_title="BEYGİR ADAM | V49", layout="wide")
+st.set_page_config(page_title="BEYGİR ADAM | V50", layout="wide")
 
-st.markdown("<h1 style='text-align:center; color:#FF8C00;'>🏇 BEYGİR ADAM v49.0</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align:center; color:#FF8C00;'>🏇 BEYGİR ADAM v50.0</h1>", unsafe_allow_html=True)
 
 file_path = "veriler.json"
 
