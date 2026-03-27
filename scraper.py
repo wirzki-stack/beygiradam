@@ -1,8 +1,3 @@
-"""
-scraper.py — TJK web sitesinden günlük at yarışı programını çeker.
-HTML parse yöntemi kullanır (api.tjk.org yerine), 403 sorunu yoktur.
-Çıktı: veriler.json
-"""
 import requests
 import json
 import re
