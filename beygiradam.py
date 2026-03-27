@@ -293,12 +293,15 @@ if calistir:
                             plaseler = sirali_at[1:3]
                             toplam_hp = sum(a.get("hp",50) for a in sirali_at) or 1
                             satirlar = [f"- {a['isim']}: %{max(5,int(a.get('hp',50)/toplam_hp*100))}" for a in sirali_at[:5]]
-                            analiz = (f"🏆 **BANKO:** {banko['isim']} (No:{banko['no']}) — HP puanı en yüksek.\n\n"
-                                     f"🥈 **PLASE:** {', '.join([f\"{p['isim']} (No:{p['no']})\" for p in plaseler])}\n\n"
-                                     f"📊 **KAZANMA TAHMİNİ:**\n" + "\n".join(satirlar) +
-                                     f"\n\n💡 **YORUM:** HP sıralamasına göre {banko['isim']} bu koşunun favorisi. "
-                                     f"Pist durumu ve jokey performansı sonucu etkileyebilir.\n\n"
-                                     f"⚠️ *Demo mod — gerçek AI analizi için API key girin.*")
+                            plase_str = ", ".join([p["isim"] + " (No:" + str(p["no"]) + ")" for p in plaseler])
+                            analiz = (
+                                "🏆 **BANKO:** " + banko["isim"] + " (No:" + str(banko["no"]) + ") — HP puanı en yüksek.\n\n"
+                                "🥈 **PLASE:** " + plase_str + "\n\n"
+                                "📊 **KAZANMA TAHMİNİ:**\n" + "\n".join(satirlar) + "\n\n"
+                                "💡 **YORUM:** HP sıralamasına göre " + banko["isim"] + " bu koşunun favorisi. "
+                                "Pist durumu ve jokey performansı sonucu etkileyebilir.\n\n"
+                                "⚠️ *Demo mod — gerçek AI analizi için API key girin.*"
+                            )
                             st.session_state[key] = analiz
                         else:
                             with st.spinner(f"{kosu['no']}. ayak analiz ediliyor..."):
