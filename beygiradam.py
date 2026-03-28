@@ -169,7 +169,20 @@ def claude_analiz(api_key, kosu):
 # ── Sidebar ───────────────────────────────────────────────────
 with st.sidebar:
     st.markdown('<div style="font-family:Bebas Neue,sans-serif;font-size:1.6rem;letter-spacing:3px;color:#D4A843;margin-bottom:1rem;">⚙ AYARLAR</div>', unsafe_allow_html=True)
-    api_key = st.text_input("Anthropic API Key", type="password", placeholder="sk-ant-api03-...")
+
+    # API key — session_state ile sakla (buton tıklamasında kaybolmasın)
+    _girilen = st.text_input(
+        "Anthropic API Key",
+        type="password",
+        placeholder="sk-ant-api03-...",
+        key="api_key_widget"
+    )
+    if _girilen.strip().startswith("sk-"):
+        st.session_state["_api_key"] = _girilen.strip()
+    api_key = st.session_state.get("_api_key", "")
+    if api_key:
+        st.markdown('<div style="font-size:0.78rem;color:#22C55E;">✅ API Key girildi</div>', unsafe_allow_html=True)
+
     st.markdown("---")
     tarih_sec = st.date_input("Analiz Tarihi", value=datetime.now().date())
     st.markdown("---")
