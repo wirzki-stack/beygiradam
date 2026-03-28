@@ -48,12 +48,14 @@ HEADERS = {
 
 # ── Veri Çekme ────────────────────────────────────────────────
 def csv_dene(tarih_ymd, sehir_adi):
+    from urllib.parse import quote
     obj = datetime.strptime(tarih_ymd, "%Y-%m-%d")
     yil = obj.strftime("%Y")
     klasor = obj.strftime("%Y-%m-%d")
     dosya = obj.strftime("%d.%m.%Y")
+    sehir_enc = quote(sehir_adi, safe="")
     url = (f"https://medya-cdn.tjk.org/raporftp/TJKPDF/{yil}/{klasor}/CSV/"
-           f"GunlukYarisProgrami/{dosya}-{sehir_adi}-GunlukYarisProgrami-TR.csv")
+           f"GunlukYarisProgrami/{dosya}-{sehir_enc}-GunlukYarisProgrami-TR.csv")
     try:
         r = requests.get(url, headers=HEADERS, timeout=12)
         if r.status_code == 200 and len(r.content) > 200:
@@ -126,22 +128,24 @@ def csv_parse(raw, sehir_adi):
 def tjk_veri_cek(tarih_ymd):
     tum = []
     denenen = []
-    # Farklı şehir ismi varyantlarını dene
+    # Her şehir için Türkçe karakterli ismi URL-encode ederek dene
+    # TJK CDN dosya adlarında şehir ismi Türkçe karakterli kullanılıyor (İzmir örneği doğrulandı)
     sehir_varyantlar = {
-        "İstanbul": ["İstanbul","Istanbul","istanbul"],
-        "Ankara":   ["Ankara","ankara"],
-        "İzmir":    ["İzmir","Izmir","izmir"],
-        "Bursa":    ["Bursa","bursa"],
-        "Adana":    ["Adana","adana"],
-        "Antalya":  ["Antalya","antalya"],
-        "Kocaeli":  ["Kocaeli","kocaeli"],
-        "Diyarbakır":["Diyarbakır","Diyarbakir","diyarbakir"],
-        "Elazığ":   ["Elazığ","Elazig","elazig"],
-        "Şanlıurfa":["Şanlıurfa","Sanliurfa","sanliurfa"],
+        "İstanbul": ["İstanbul", "Istanbul"],
+        "Ankara":   ["Ankara"],
+        "İzmir":    ["İzmir", "Izmir"],
+        "Bursa":    ["Bursa"],
+        "Adana":    ["Adana"],
+        "Antalya":  ["Antalya"],
+        "Kocaeli":  ["Kocaeli"],
+        "Diyarbakır": ["Diyarbakır", "Diyarbakir"],
+        "Elazığ":   ["Elazığ", "Elazig"],
+        "Şanlıurfa":["Şanlıurfa", "Sanliurfa"],
     }
     for sehir, varyantlar in sehir_varyantlar.items():
         for v in varyantlar:
             raw, url = csv_dene(tarih_ymd, v)
+            denened_url = url
             denenen.append(url)
             if raw:
                 kosular = csv_parse(raw, sehir)
@@ -149,7 +153,8 @@ def tjk_veri_cek(tarih_ymd):
                     tum.extend(kosular)
                 break
     if not tum:
-        return None, f"Bugün hiçbir hipodromda program bulunamadı.\nDenenen örnek URL:\n{denenen[0]}"
+        ornek = denenen[0] if denenen else "?"
+        return None, f"Bugün hiçbir hipodromda program bulunamadı.\n\nDenenen URL örneği:\n{ornek}"
     return {"tarih": tarih_ymd, "kosular": tum, "kaynak":"tjk-cdn"}, None
 
 # ── Claude Analiz ─────────────────────────────────────────────
