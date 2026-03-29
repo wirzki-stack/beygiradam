@@ -1,7 +1,6 @@
 import streamlit as st
 import requests, re, time
 from datetime import datetime, timedelta
-from urllib.parse import quote
 
 st.set_page_config(page_title="🏇 BeygiRadam", page_icon="🏇", layout="wide", initial_sidebar_state="expanded")
 
@@ -23,7 +22,7 @@ html,body,[class*="css"]{font-family:'DM Sans',sans-serif;background-color:var(-
 .at-name{font-weight:500;flex:1;font-size:0.88rem;}
 .at-jokey{font-size:0.75rem;color:var(--muted);min-width:90px;}
 .at-hp{font-family:'DM Mono',monospace;font-size:0.82rem;}
-.at-form{font-family:'DM Mono',monospace;font-size:0.75rem;color:var(--muted);min-width:70px;text-align:right;}
+.at-form{font-family:'DM Mono',monospace;font-size:0.75rem;color:var(--muted);min-width:60px;text-align:right;}
 .ai-box{background:linear-gradient(135deg,#0D1117,#111827);border:1px solid #1E3A5F;border-left:3px solid var(--blue);border-radius:8px;padding:1rem 1.2rem;font-size:0.87rem;line-height:1.75;color:#CBD5E1;white-space:pre-wrap;}
 .info-strip{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:0.8rem 1rem;font-size:0.82rem;color:var(--muted);margin-bottom:1rem;}
 .date-chip{display:inline-block;background:var(--bg3);border:1px solid var(--border);border-radius:20px;padding:0.2rem 0.8rem;font-family:'DM Mono',monospace;font-size:0.78rem;color:var(--gold);margin-bottom:1rem;}
@@ -35,151 +34,197 @@ hr{border-color:var(--border)!important;}
 </style>
 """, unsafe_allow_html=True)
 
+# ── Sporx'tan veri çekme ──────────────────────────────────────
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     "Accept-Language": "tr-TR,tr;q=0.9,en;q=0.8",
-    "Referer": "https://www.tjk.org/",
-    "Connection": "keep-alive",
+    "Referer": "https://www.sporx.com/",
 }
 
-# TJK şehir listesi — SehirId değerleri TJK'dan alındı
-SEHIRLER = [
-    {"id":"2",  "adi":"İzmir"},
-    {"id":"1",  "adi":"Adana"},
-    {"id":"3",  "adi":"Ankara"},
-    {"id":"6",  "adi":"İstanbul"},
-    {"id":"5",  "adi":"Bursa"},
-    {"id":"10", "adi":"Antalya"},
-    {"id":"9",  "adi":"Kocaeli"},
-    {"id":"4",  "adi":"Diyarbakır"},
-    {"id":"7",  "adi":"Elazığ"},
-    {"id":"8",  "adi":"Şanlıurfa"},
+# Sporx'taki hipodrom kodları
+SPORX_HIPODROMLAR = [
+    ("IZMIR",     "İzmir"),
+    ("ADANA",     "Adana"),
+    ("ANKARA",    "Ankara"),
+    ("ISTANBUL",  "İstanbul"),
+    ("BURSA",     "Bursa"),
+    ("ANTALYA",   "Antalya"),
+    ("KOCAELI",   "Kocaeli"),
+    ("DIYARBAKIR","Diyarbakır"),
+    ("ELAZIG",    "Elazığ"),
+    ("SANLIURFA", "Şanlıurfa"),
 ]
 
-def tarih_tr(tarih_ymd):
-    return datetime.strptime(tarih_ymd, "%Y-%m-%d").strftime("%d/%m/%Y")
-
-def sehir_html_cek(tarih_ymd, sehir_id, sehir_adi):
-    """Şehir program sayfasını çek."""
-    t = tarih_tr(tarih_ymd).replace("/", "%2F")
-    s = quote(sehir_adi, safe="")
-    url = (f"https://www.tjk.org/TR/yarissever/Info/Sehir/GunlukYarisProgrami"
-           f"?SehirId={sehir_id}&QueryParameter_Tarih={t}&SehirAdi={s}&Era=today")
+def sporx_ana_sayfa():
+    """Sporx'tan bugünkü aktif hipodromları çek."""
     try:
-        r = requests.get(url, headers=HEADERS, timeout=15)
-        if r.status_code == 200 and len(r.text) > 1000:
+        r = requests.get("https://www.sporx.com/at-yarisi", headers=HEADERS, timeout=15)
+        if r.status_code == 200:
             return r.text
     except:
         pass
     return None
 
-def parse_kosular_html(html, sehir_adi):
-    """HTML'den tüm koşu ve at bilgilerini çıkar."""
-    kosular = []
+def aktif_hipodromlar_bul(html):
+    """Sporx ana sayfasından bugün yarışı olan Türk hipodromlarını bul."""
+    # Sporx: <a href="/at-yarisi?hipodrom=IZMIR">İzmir</a>
+    pattern = re.compile(r'at-yarisi\?hipodrom=([A-Z]+)[^"]*"[^>]*>([^<]+)<', re.IGNORECASE)
+    bulunan = []
+    goruldu = set()
+    for m in pattern.finditer(html):
+        kod = m.group(1).upper()
+        isim = m.group(2).strip()
+        if kod not in goruldu and any(kod == h[0] for h in SPORX_HIPODROMLAR):
+            goruldu.add(kod)
+            # Türkçe ismi bizim listeden al
+            for hkod, hadi in SPORX_HIPODROMLAR:
+                if hkod == kod:
+                    bulunan.append((kod, hadi))
+                    break
+    return bulunan
+
+def sporx_hipodrom_cek(kod):
+    """Bir hipodromun koşu listesini çek."""
+    url = f"https://www.sporx.com/at-yarisi?hipodrom={kod}"
+    try:
+        r = requests.get(url, headers=HEADERS, timeout=15)
+        if r.status_code == 200:
+            return r.text
+    except:
+        pass
+    return None
+
+def sporx_parse(html, sehir_adi):
+    """Sporx HTML'inden koşu ve at verilerini çıkar."""
+    kosular = {}
     temiz = re.compile(r'<[^>]+>')
 
-    # Pist durumu
-    pist_durum = ""
-    pm = re.search(r'(Kum|Çim|Sentetik):\s*([^\n<]{1,30})', html)
-    if pm:
-        pist_durum = pm.group(1) + " - " + pm.group(2).strip()
-
-    # Koşu bloklarını ayır: her "X. Koşu:HH.MM" başlığı
-    # TJK HTML: <h3><a ...>X. Koşu:HH.MM</a></h3>
-    blok_re = re.compile(r'(\d+)\.\s*Koşu[:\s]*([\d.]+)', re.IGNORECASE)
-    pozlar = [(m.start(), int(m.group(1)), m.group(2).strip()) for m in blok_re.finditer(html)]
-
-    for idx, (pos, kno, saat) in enumerate(pozlar):
-        bitis = pozlar[idx+1][0] if idx+1 < len(pozlar) else len(html)
-        blok = html[pos:bitis]
-
-        # Mesafe ve pist
-        mm = re.search(r',\s*(\d{3,4})\s+(Kum|Çim|Sentetik)', blok)
-        mesafe = mm.group(1) if mm else "?"
-        pist   = mm.group(2) if mm else "?"
-
-        # Koşu türü
-        tm = re.search(r'(Handikap[\w\s/]*|ŞARTLI[\w\s/]*|Maiden|Grup\s*\d*|G\s*\d)', blok[:300], re.IGNORECASE)
-        tur = tm.group(0).strip() if tm else "Düz"
-
-        # At satırlarını çek — her at için tablo satırı
-        atlar = parse_atlar_html(blok)
-        if atlar:
-            kosular.append({
-                "no": kno, "sehir": sehir_adi, "saat": saat,
-                "mesafe": mesafe, "pist": pist, "tur": tur,
-                "pist_durum": pist_durum, "atlar": atlar
-            })
-
-    return kosular
-
-def parse_atlar_html(blok):
-    """Bir koşu bloğundaki at listesini çıkar."""
-    atlar = []
-    temiz = re.compile(r'<[^>]+>')
-
-    # Her at satırı: AtKosuBilgileri linkini içeren <tr>
+    # Sporx tablo yapısı: NO, AT/YAŞ/BİLGİLER, KİLO, JOKEY, ORİJİN, SAHİP/ANTRENÖR, HP, SON6, KGS, EİD, GANYAN, AGF
+    # Her koşu başlığı: "X. Koşu" veya koşu saati
+    
+    # Önce koşu bloklarını bul
+    kosu_re = re.compile(r'(\d+)\.\s*Ko[sş]u', re.IGNORECASE)
+    saat_re = re.compile(r'(\d{2}:\d{2})')
+    mesafe_re = re.compile(r'(\d{3,4})\s*(Kum|Çim|Sentetik|ÇİM|KUM)', re.IGNORECASE)
+    
+    # Tablo satırlarını çek — her <tr> potansiyel at satırı
     satir_re = re.compile(r'<tr[^>]*>(.*?)</tr>', re.DOTALL | re.IGNORECASE)
     td_re    = re.compile(r'<td[^>]*>(.*?)</td>', re.DOTALL | re.IGNORECASE)
-    at_re    = re.compile(r'AtKosuBilgileri[^>]+>\s*([^<(]+)\s*\((\d+)\)', re.DOTALL)
-    jok_re   = re.compile(r'JokeyIstatistikleri[^>]+title="([^"]+)"')
-
-    for satir in satir_re.findall(blok):
-        at_m = at_re.search(satir)
-        if not at_m:
+    
+    # Sporx'ta at bilgisi sütunları: NO | AT İSMİ (yaş) | KİLO | JOKEY | ... | HP | SON6 | ...
+    # at ismi bold: <strong>AT İSMİ</strong> veya düz metin
+    
+    mevcut_kosu = 1
+    mevcut_saat = "?"
+    mevcut_mesafe = "?"
+    mevcut_pist = "?"
+    
+    # HTML'yi satır satır işle
+    for satir_html in satir_re.findall(html):
+        tdler = td_re.findall(satir_html)
+        if not tdler:
             continue
+        
+        temizler = [re.sub(r'\s+', ' ', temiz.sub('', td)).strip() for td in tdler]
+        
+        # Koşu başlığı satırı — "X. Koşu" içeriyor
+        satir_metin = temiz.sub('', satir_html)
+        km = kosu_re.search(satir_metin)
+        if km:
+            mevcut_kosu = int(km.group(1))
+            sm = saat_re.search(satir_metin)
+            if sm:
+                mevcut_saat = sm.group(1)
+            mm = mesafe_re.search(satir_metin)
+            if mm:
+                mevcut_mesafe = mm.group(1)
+                mevcut_pist = mm.group(2).capitalize()
+            continue
+        
+        # At satırı: ilk sütun rakam (at no), 2. sütunda at ismi
+        if len(temizler) >= 7:
+            # İlk kolon at numarası olmalı
+            try:
+                at_no = int(temizler[0])
+            except:
+                # ST: prefix ile olabilir
+                m = re.match(r'ST:\s*\d+', temizler[0], re.IGNORECASE)
+                if not m:
+                    continue
+                try:
+                    at_no = int(re.search(r'\d+', temizler[0]).group())
+                except:
+                    continue
+            
+            # 2. sütun: AT İSMİ (yaş bilgisi de olabilir)
+            at_raw = temizler[1] if len(temizler) > 1 else ""
+            # İsmi ayır: büyük harfler isim, küçük/yaş bilgisi ayrı
+            at_isim = re.split(r'\s+\d+[yY]', at_raw)[0].strip()
+            if len(at_isim) < 2:
+                continue
+            
+            # Jokey — genellikle 3. veya 4. sütun
+            jokey = temizler[3] if len(temizler) > 3 else "-"
+            if not jokey or len(jokey) < 2:
+                jokey = temizler[2] if len(temizler) > 2 else "-"
+            
+            # HP — 7. sütun (index 6)
+            hp = 0
+            for i in range(5, min(9, len(temizler))):
+                try:
+                    v = int(temizler[i])
+                    if 10 <= v <= 150:
+                        hp = v
+                        break
+                except:
+                    pass
+            
+            # Son 6 yarış — 8. sütun
+            form = "-"
+            for i in range(6, min(10, len(temizler))):
+                if re.match(r'^[\d\-]+$', temizler[i]) and len(temizler[i]) >= 3:
+                    form = temizler[i]
+                    break
+            
+            if mevcut_kosu not in kosular:
+                kosular[mevcut_kosu] = {
+                    "no": mevcut_kosu, "sehir": sehir_adi,
+                    "saat": mevcut_saat, "mesafe": mevcut_mesafe,
+                    "pist": mevcut_pist, "tur": "Düz", "atlar": []
+                }
+            
+            kosular[mevcut_kosu]["atlar"].append({
+                "no": at_no, "isim": at_isim,
+                "jokey": jokey, "hp": hp, "form": form
+            })
+    
+    return [v for v in kosular.values() if v["atlar"]]
 
-        at_isim = re.sub(r'\s+', ' ', temiz.sub('', at_m.group(1)).strip())
-        yaris_no = int(at_m.group(2))
-
-        jok_m = jok_re.search(satir)
-        jokey = jok_m.group(1).strip() if jok_m else "-"
-
-        # Tüm <td> değerlerini al
-        tdler = [re.sub(r'\s+', ' ', temiz.sub('', td).strip()) for td in td_re.findall(satir)]
-
-        hp = 0
-        form = "-"
-        for val in tdler:
-            if re.match(r'^\d{2,3}$', val) and hp == 0:
-                hp = int(val)
-            if re.match(r'^[\d\*\-]+$', val) and len(val) >= 5 and ('-' in val or '*' in val):
-                form = val.replace('*', '')
-
-        atlar.append({
-            "no": yaris_no,
-            "isim": at_isim,
-            "jokey": jokey,
-            "hp": hp,
-            "form": form
-        })
-
-    return atlar
-
-def tjk_veri_cek(tarih_ymd):
-    """Tüm Türkiye hipodromlarından veri çek."""
-    tum = []
-    bos_sehirler = []
-
-    for s in SEHIRLER:
-        html = sehir_html_cek(tarih_ymd, s["id"], s["adi"])
+def veri_cek(tarih_ymd):
+    """Sporx'tan bugünkü tüm koşuları çek."""
+    # Ana sayfadan aktif hipodromları bul
+    ana_html = sporx_ana_sayfa()
+    if not ana_html:
+        return None, "Sporx'a bağlanılamadı"
+    
+    aktif = aktif_hipodromlar_bul(ana_html)
+    if not aktif:
+        # Fallback: tüm hipodromları dene
+        aktif = SPORX_HIPODROMLAR[:5]
+    
+    tum_kosular = []
+    for kod, adi in aktif:
+        html = sporx_hipodrom_cek(kod)
         if not html:
-            bos_sehirler.append(s["adi"])
             continue
-
-        # Sayfa içeriği var mı kontrol et (koşu yoksa "Koşu" kelimesi olmaz)
-        if "Koşu:" not in html and "koşu" not in html.lower():
-            bos_sehirler.append(s["adi"])
-            continue
-
-        kosular = parse_kosular_html(html, s["adi"])
-        if kosular:
-            tum.extend(kosular)
-
-    if not tum:
-        return None, "Bugün hiçbir hipodromda program bulunamadı."
-    return {"tarih": tarih_ymd, "kosular": tum}, None
+        kosular = sporx_parse(html, adi)
+        tum_kosular.extend(kosular)
+    
+    if not tum_kosular:
+        return None, "Bugün aktif hipodromda koşu bulunamadı"
+    
+    return {"tarih": tarih_ymd, "kosular": tum_kosular}, None
 
 def claude_analiz(api_key, kosu):
     atlar = kosu["atlar"]
@@ -189,15 +234,14 @@ def claude_analiz(api_key, kosu):
     ])
     prompt = (
         f"Sen TJK Türkiye at yarışları uzmanısın.\n\n"
-        f"KOŞU: {kosu['no']}. Ayak | {kosu['sehir']} | {kosu['mesafe']}m {kosu['pist']} | "
-        f"{kosu['tur']} | Saat: {kosu['saat']}\n\n"
+        f"KOŞU: {kosu['no']}. Ayak | {kosu['sehir']} | {kosu['mesafe']}m {kosu['pist']} | Saat: {kosu['saat']}\n\n"
         f"KATILIMCILAR:\n{at_listesi}\n\n"
         f"Analiz et:\n"
         f"1. BANKO: En guçlu 1 at (isim + no + kisa gerekce)\n"
         f"2. PLASE: 2-3 alternatif\n"
         f"3. KAZANMA TAHMINI: One cikan 4-5 at icin % olasilik\n"
         f"4. KISA YORUM: 2-3 cumle\n\n"
-        f"Turkce yaz, kisa ve net ol. Son satira uyari ekle."
+        f"Turkce, kisa, net. Son satira uyari ekle."
     )
     try:
         r = requests.post(
@@ -235,10 +279,10 @@ with st.sidebar:
     st.markdown("---")
     tarih_sec = st.date_input("Analiz Tarihi", value=datetime.now().date())
     st.markdown("---")
-    st.markdown('<div style="font-size:0.75rem;color:#5A5E6B;line-height:1.9;">🔒 Key sunucuda saklanmaz.<br>📡 Veri: tjk.org HTML<br>🤖 Analiz: Claude Sonnet<br>⚠️ Yalnızca bilgi amaçlıdır.</div>', unsafe_allow_html=True)
+    st.markdown('<div style="font-size:0.75rem;color:#5A5E6B;line-height:1.9;">🔒 Key sunucuda saklanmaz.<br>📡 Veri: sporx.com<br>🤖 Analiz: Claude Sonnet<br>⚠️ Yalnızca bilgi amaçlıdır.</div>', unsafe_allow_html=True)
 
 # ── Hero ──────────────────────────────────────────────────────
-st.markdown('<div class="hero"><h1>BEYGİR ADAM</h1><p>Türkiye At Yarışları · Otomatik AI Analiz Sistemi · TJK Verisi</p></div>', unsafe_allow_html=True)
+st.markdown('<div class="hero"><h1>BEYGİR ADAM</h1><p>Türkiye At Yarışları · Otomatik AI Analiz Sistemi · sporx.com verisi</p></div>', unsafe_allow_html=True)
 tarih_ymd = tarih_sec.strftime("%Y-%m-%d")
 st.markdown(f'<div class="date-chip">📅 {tarih_sec.strftime("%d %B %Y")}</div>', unsafe_allow_html=True)
 
@@ -249,12 +293,12 @@ calistir = st.button("📡 VERİ ÇEK & ANALİZ ET", disabled=(not api_key))
 
 # ── Ana Mantık ────────────────────────────────────────────────
 if calistir and api_key:
-    with st.spinner("📡 TJK'dan program çekiliyor..."):
-        veri, hata = tjk_veri_cek(tarih_ymd)
+    with st.spinner("📡 sporx.com'dan program çekiliyor..."):
+        veri, hata = veri_cek(tarih_ymd)
 
     if hata or not veri:
         st.error("❌ " + (hata or "Veri alınamadı"))
-        st.info("💡 Yarış programı henüz yayınlanmamış olabilir veya bugün yarış yoktur.")
+        st.info("💡 Yarış programı henüz yayınlanmamış veya bugün yarış yoktur.")
         st.stop()
 
     kosular = veri["kosular"]
@@ -314,9 +358,9 @@ elif not calistir:
     st.markdown("---")
     c1, c2, c3 = st.columns(3)
     for col, (ico, bas, ac) in zip([c1,c2,c3],[
-        ("📡","HTML Parse","tjk.org sayfasını doğrudan okur. CSV veya API gerektirmez."),
-        ("🤖","AI Analiz","Claude Sonnet her koşu için banko, plase ve kazanma tahmini üretir."),
-        ("🔒","Güvenli","API key Secrets ile korunur. Sunucuda saklanmaz."),
+        ("📡","Otomatik Veri","sporx.com'dan günlük programı çeker. TJK engelini aşar."),
+        ("🤖","AI Analiz","Claude Sonnet banko, plase ve kazanma tahmini üretir."),
+        ("🔒","Güvenli","API key Secrets ile korunur, sunucuda saklanmaz."),
     ]):
         with col:
             st.markdown(f'<div class="stat-box" style="text-align:left;"><div style="font-size:1.5rem;margin-bottom:0.5rem;">{ico}</div><div style="font-weight:500;margin-bottom:0.3rem;">{bas}</div><div style="font-size:0.8rem;color:#5A5E6B;">{ac}</div></div>', unsafe_allow_html=True)
